@@ -30,8 +30,8 @@ export const getSingleQuestion = onCall(
 
       const doc = snapshot.docs[0];
       const question = doc.data();
-      question.id = doc.id;
-
-      return {question};
+      const plainQuestion = JSON.parse(JSON.stringify(question));
+      plainQuestion.id = doc.id;
+      return {question: plainQuestion};
     },
 );
