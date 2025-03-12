@@ -11,8 +11,7 @@ export const getSingleQuestion = onCall(
     },
     async (data, context) => {
       if (!context.auth) {
-        console.log("Unauthenticated call; proceeding without user context.");
-        // throw new HttpsError("unauthenticated", "User must be authenticated.");
+        throw new HttpsError("unauthenticated", "User must be authenticated.");
       }
 
       const chapter = parseInt(data.chapter) || 1;
