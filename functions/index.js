@@ -4,7 +4,7 @@ import admin from "firebase-admin";
 admin.initializeApp();
 const db = admin.firestore();
 
-export const getSingleQuestion = onCall(
+export const getQuestionsByChapter = onCall(
     {
       region: "us-west1",
       enforceAppCheck: true,
@@ -21,18 +21,40 @@ export const getSingleQuestion = onCall(
       const questionsQuery = db
           .collection("questions")
           .where("chapter", "==", chapter)
-          .orderBy("questionNumber")
-          .limit(1);
+          .orderBy("questionNumber");
 
       const snapshot = await questionsQuery.get();
       if (snapshot.empty) {
         throw new HttpsError("not-found", "No question found");
       }
 
-      const doc = snapshot.docs[0];
-      const question = doc.data();
-      const plainQuestion = JSON.parse(JSON.stringify(question));
-      plainQuestion.id = doc.id;
-      return {question: plainQuestion};
+      const questions = await Promise.all(
+          snapshot.docs.map(async (doc) => {
+            const questionData = doc.data();
+            const plainQuestion = JSON.parse(JSON.stringify(questionData));
+            plainQuestion.id = doc.id;
+
+            // If sharedQuestionText is provided, fetch its document data.
+            if (
+              questionData.sharedQuestionText &&
+            questionData.sharedQuestionText._path &&
+            Array.isArray(questionData.sharedQuestionText._path.segments) &&
+            questionData.sharedQuestionText._path.segments.length >= 2
+            ) {
+              const sharedDocId = questionData.sharedQuestionText._path.segments[1];
+              const sharedDocSnap = await db
+                  .collection("sharedQuestionText")
+                  .doc(sharedDocId)
+                  .get();
+              if (sharedDocSnap.exists) {
+                plainQuestion.sharedQuestionText = sharedDocSnap.data().text;
+              }
+            }
+
+            return plainQuestion;
+          }),
+      );
+
+      return {questions: questions};
     },
 );

@@ -2,15 +2,17 @@
   <v-container>
     <v-row class="text-center">
       <v-col cols="12">
-        <h2>Quiz Question</h2>
-        <div v-if="question">
-          <p>Q{{ question.questionNumber }}: {{ question.questionText }}</p>
-          <ul>
-            <li v-for="(choice, index) in question.choices" :key="index">
-              {{ choice }}
-            </li>
-          </ul>
-          <button @click="loadNextQuestion">Next Question</button>
+        <h2>Quiz Questions</h2>
+        <div v-if="questions.length">
+          <div v-for="q in questions" :key="q.id" class="mb-4">
+            <p>Q{{ q.questionNumber }}: {{ q.question }}</p>
+            <ul>
+              <li v-for="(choice, index) in q.choices" :key="index">
+                {{ choice }}
+              </li>
+            </ul>
+          </div>
+          <button @click="loadQuestions">Reload Questions</button>
         </div>
         <div v-else>
           Loading...
@@ -22,18 +24,19 @@
 
 <script setup>
 import { ref } from "vue";
-import { fetchNextQuestion } from "../composables/useQuestion";
+import { fetchQuestionsByChapter } from "../composables/useQuestion";
 
-const question = ref(null);
+const questions = ref([]);
 
-async function loadNextQuestion() {
+async function loadQuestions() {
   try {
-    question.value = await fetchNextQuestion(1);
-    console.log("Loaded question:", question.value);
+    const result = await fetchQuestionsByChapter(1);
+    questions.value = result;
+    console.log("Loaded questions:", questions.value);
   } catch (error) {
-    console.error("Error loading question:", error);
+    console.error("Error loading questions:", error);
   }
 }
 
-loadNextQuestion();
+loadQuestions();
 </script>
