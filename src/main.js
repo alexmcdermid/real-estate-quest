@@ -3,18 +3,15 @@ import App from './App.vue'
 import vuetify from './plugins/vuetify'
 import { loadFonts } from './plugins/webfontloader'
 import { firebaseApp } from '../src/config/firebaseConfig'
-import { VueFire, VueFireAuth } from 'vuefire'
+import { VueFire, VueFireFirestoreOptionsAPI  } from 'vuefire'
 
 loadFonts()
 
-const app = createApp(app)
-
-app.use(VueFire, {
-  firebaseApp,
-  modules: [
-    VueFireAuth()
-  ]
-})
+const app = createApp(App)
 
 app.use(vuetify)
+app.use(VueFire, {
+  firebaseApp,
+  modules: [VueFireFirestoreOptionsAPI()],
+})
 app.mount('#app')

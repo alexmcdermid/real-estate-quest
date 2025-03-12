@@ -1,7 +1,9 @@
 // firebaseConfig.js
-import firebase from 'firebase/compat/app'
-import 'firebase/compat/firestore'
-import 'firebase/compat/auth'
+import { initializeApp } from 'firebase/app'
+import { getFirestore } from 'firebase/firestore'
+import { getAuth } from 'firebase/auth'
+import { getAnalytics } from 'firebase/analytics'
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -10,11 +12,23 @@ const firebaseConfig = {
     storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
     messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
     appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 }
 
-firebase.initializeApp(firebaseConfig)
+const firebaseApp = initializeApp(firebaseConfig)
+const db = getFirestore(firebaseApp)
+const auth = getAuth(firebaseApp)
+const analytics = getAnalytics(firebaseApp)
 
-const db = firebase.firestore()
-const auth = firebase.auth()
+console.log(import.meta.env.MODE);
 
-export { db, auth }
+if (import.meta.env.MODE === "development") {
+    self.FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN;
+  }
+  
+  initializeAppCheck(firebaseApp, {
+    provider: new ReCaptchaV3Provider("YOUR_RECAPTCHA_SITE_KEY"),
+    isTokenAutoRefreshEnabled: true,
+});
+
+export { firebaseApp, db, auth, analytics }
