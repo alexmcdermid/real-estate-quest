@@ -35,6 +35,5 @@ async function loadNextQuestion() {
   }
 }
 
-// Load the first question on component mount
 loadNextQuestion();
 </script>
