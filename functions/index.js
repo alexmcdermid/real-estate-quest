@@ -16,7 +16,7 @@ export const getQuestionsByChapter = onCall(
         // throw new HttpsError("unauthenticated", "User must be authenticated.");
       }
 
-      const chapter = parseInt(data.chapter) || 1;
+      const chapter = parseInt(data.data?.chapter) || 1;
 
       const questionsQuery = db
           .collection("questions")
@@ -58,3 +58,34 @@ export const getQuestionsByChapter = onCall(
       return {questions: questions};
     },
 );
+
+export const writeQuestions = onCall(
+    {
+      region: "us-west1",
+      enforceAppCheck: true,
+    },
+    async (data, context) => {
+      if (!context.auth) {
+        console.log("Unauthenticated call; proceeding without user context.");
+      // Uncomment below when users are set up
+      // throw new HttpsError("unauthenticated", "User must be authenticated.");
+      }
+
+      const questions = data.data?.questions;
+      console.log("Received questions:", questions);
+      if (!Array.isArray(questions)) {
+        throw new HttpsError("invalid-argument", "Questions must be an array.");
+      }
+
+      const batch = db.batch();
+      questions.forEach((question) => {
+        const docRef = db.collection("questions").doc();
+        batch.set(docRef, question);
+      });
+
+      await batch.commit();
+
+      return {success: true};
+    },
+);
+

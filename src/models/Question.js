@@ -8,4 +8,5 @@
  * @property {number} correctChoice - Index of the correct response (0-based).
  * @property {number} chapter - Chapter reference.
  * @property {UUID} sharedQuestionText - (Optional) UUID reference to a shared question text document.
+ * @property {boolean} premium - is the question a premium only question.
  */

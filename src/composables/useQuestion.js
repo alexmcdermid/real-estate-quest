@@ -25,3 +25,19 @@ export async function fetchQuestionsByChapter(chapter = 1) {
     throw error;
   }
 }
+
+export async function writeQuestions() {
+  const questions = [
+  ];
+  
+  const functions = getFunctions(firebaseApp, "us-west1");
+  const writeQuestionsCallable = httpsCallable(functions, "writeQuestions");
+  try {
+    const safeQuestions = JSON.parse(JSON.stringify(questions));
+    const result = await writeQuestionsCallable({ questions: safeQuestions });
+    return result.data;
+  } catch (error) {
+    console.error("Error fetching question:", error);
+    throw error;
+  }
+}
