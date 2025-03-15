@@ -1,7 +1,7 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp } from "../config/firebaseConfig";
 
-const CACHE_KEY = "qc";
+const CACHE_KEY = "real-estate-quest";
 
 function encodeCache(cacheObject) {
   return btoa(JSON.stringify(cacheObject));
