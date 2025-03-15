@@ -18,7 +18,6 @@
               </li>
             </ul>
           </div>
-          <button @click="saveQuestions" v-if="questions.length < 2">Save Questions</button>
         </div>
         <div v-else>
           Loading...
@@ -30,7 +29,7 @@
 
 <script setup>
 import { ref, watch } from "vue";
-import { fetchQuestionsByChapter, writeQuestions } from "../composables/useQuestion";
+import { fetchQuestionsByChapter } from "../composables/useQuestion";
 
 const chapters = [1, 2, 3, 4];
 const selectedChapter = ref(1);
@@ -49,15 +48,6 @@ async function loadQuestions() {
 watch(selectedChapter, () => {
   loadQuestions();
 });
-
-async function saveQuestions() {
-  try {
-    const response = await writeQuestions();
-    console.log("Questions saved:", response);
-  } catch (error) {
-    console.error("Error saving questions:", error);
-  }
-}
 
 loadQuestions();
 </script>
