@@ -34,7 +34,7 @@ export function clearCache() {
  * Returns a Promise that resolves with the currentUser
  * once the authentication state is ready.
  */
-function waitUntilUserIsReady() {
+async function waitUntilUserIsReady() {
   const auth = getAuth(firebaseApp);
   return new Promise((resolve) => {
     if (auth.currentUser !== null) {
@@ -51,7 +51,6 @@ function waitUntilUserIsReady() {
 export async function fetchQuestionsByChapter(chapter = 1) {
   // Wait until auth state is initialized.
   const user = await waitUntilUserIsReady();
-  const auth = getAuth(firebaseApp);
   let idToken = null;
   
   if (user) {
