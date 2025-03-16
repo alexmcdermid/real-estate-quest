@@ -6,24 +6,57 @@ import crypto from "crypto";
 admin.initializeApp();
 const db = admin.firestore();
 
+/**
+ * Safely stringifies an object by omitting circular references.
+ *
+ * @param {any} obj - The object to stringify.
+ * @param {number} [indent=2] - The number of spaces to use for indentation.
+ * @return {string} The JSON string representation of the object.
+ */
+function safeStringify(obj, indent = 2) {
+  const cache = new Set();
+  return JSON.stringify(obj, (key, value) => {
+    if (typeof value === "object" && value !== null) {
+      if (cache.has(value)) {
+        // Duplicate reference found, discard key
+        return;
+      }
+      cache.add(value);
+    }
+    return value;
+  }, indent);
+}
+
 export const getQuestionsByChapter = onCall(
     {
       region: "us-west1",
       enforceAppCheck: true,
     },
     async (data, context) => {
-      if (!context.auth) {
-        console.log("Unauthenticated call; proceeding without user context.");
-      // Uncomment below when user authentication is enabled:
-      // throw new HttpsError("unauthenticated", "User must be authenticated.");
+      let isPremium = false;
+      console.log("Received context:", safeStringify(context));
+      console.log("Received data:", safeStringify(data));
+      if (context.auth && context.auth.uid) {
+        // Check if the authenticated user is a premium member.
+        const memberSnap = await db.collection("members").doc(context.auth.uid).get();
+        console.log(memberSnap);
+        console.log(memberSnap.exists && memberSnap.data().member === true);
+        if (memberSnap.exists && memberSnap.data().member === true) {
+          isPremium = true;
+        }
       }
 
       const chapter = parseInt(data.data?.chapter) || 1;
+      console.log("chapter" + chapter);
 
-      const questionsQuery = db
-          .collection("questions")
-          .where("chapter", "==", chapter)
-          .orderBy("questionNumber");
+      let questionsQuery = db.collection("questions")
+          .where("chapter", "==", chapter);
+
+      if (!isPremium) {
+        questionsQuery = questionsQuery.where("premium", "==", false).orderBy("questionNumber");
+      } else {
+        questionsQuery = questionsQuery.orderBy("questionNumber");
+      }
 
       const snapshot = await questionsQuery.get();
       if (snapshot.empty) {
@@ -74,68 +107,74 @@ export const importQuestionsFromRepo = onSchedule(
         const token = process.env.GITHUB_TOKEN;
         const username = process.env.GITHUB_USERNAME;
         const repo = process.env.GITHUB_REPO;
-
         if (!token || !username || !repo) {
           console.error("Missing repo credentials");
           return;
         }
 
-        const repoUrl = `https://api.github.com/repos/${username}/${repo}/contents/questions.js`;
-
-        const response = await fetch(repoUrl, {
-          headers: {Authorization: `token ${token}`},
-        });
-
-        const data = await response.json();
-        if (!data.content) {
-          console.error("No content found in the file from GitHub");
-          return;
-        }
-
-        // Decode the file (GitHub returns the content in base64)
-        const jsonStr = Buffer.from(data.content, "base64").toString("utf8");
-
-        // Compute a SHA-256 hash of the JSON string
-        const newHash = crypto
-            .createHash("sha256")
-            .update(jsonStr)
-            .digest("hex");
-
-        // Reference to a document where we store the hash of the last updated questions
+        const chapters = [1, 2];
         const metadataRef = db.collection("metadata").doc("questions");
 
+        // Get existing metadata document for hashes
         const metadataDoc = await metadataRef.get();
-        const storedHash = metadataDoc.exists ? metadataDoc.data().hash : null;
+        const metadata = metadataDoc.exists ? metadataDoc.data() : {};
 
-        if (storedHash === newHash) {
-          console.log("No changes detected; skipping update.");
-          return;
+        for (const chapter of chapters) {
+          const repoUrl = `https://api.github.com/repos/${username}/${repo}/contents/${chapter}.js`;
+
+          const response = await fetch(repoUrl, {
+            headers: {Authorization: `token ${token}`},
+          });
+          const data = await response.json();
+          if (!data.content) {
+            console.error(`No content found in the file for chapter ${chapter} from GitHub`);
+            continue;
+          }
+
+          // Decode the file content (GitHub returns the content in base64)
+          const jsonStr = Buffer.from(data.content, "base64").toString("utf8");
+
+          // Compute a SHA-256 hash of the JSON string
+          const newHash = crypto.createHash("sha256").update(jsonStr).digest("hex");
+          const storedHash = metadata[`hash_${chapter}`] || null;
+          if (storedHash === newHash) {
+            console.log(`No changes detected for chapter ${chapter}; skipping update.`);
+            continue;
+          }
+
+          // Parse the questions (assume the file is valid JSON array)
+          const questions = JSON.parse(jsonStr);
+          console.log(`Fetched questions for chapter ${chapter} from repo:`, questions);
+
+          // Delete all existing questions for this chapter
+          const chapterQuerySnapshot = await db
+              .collection("questions")
+              .where("chapter", "==", chapter)
+              .get();
+          const deleteBatch = db.batch();
+          chapterQuerySnapshot.docs.forEach((doc) => {
+            deleteBatch.delete(doc.ref);
+          });
+          await deleteBatch.commit();
+          console.log(`Cleared the questions for chapter ${chapter}`);
+
+          // Add new questions in a batch write (ensure each question has the correct chapter field)
+          const addBatch = db.batch();
+          questions.forEach((question) => {
+            question.chapter = chapter;
+            const docRef = db.collection("questions").doc();
+            addBatch.set(docRef, question);
+          });
+          await addBatch.commit();
+          console.log(`Questions for chapter ${chapter} imported to Firestore successfully`);
+
+          // Update the stored hash for this chapter in metadata
+          metadata[`hash_${chapter}`] = newHash;
         }
 
-        const questions = JSON.parse(jsonStr);
-        console.log("Fetched questions from repo:", questions);
-
-        // Clear the entire "questions" collection
-        const questionsSnapshot = await db.collection("questions").get();
-        const deleteBatch = db.batch();
-        questionsSnapshot.docs.forEach((doc) => {
-          deleteBatch.delete(doc.ref);
-        });
-        await deleteBatch.commit();
-        console.log("Cleared the questions collection");
-
-        // Add new questions in a batch write
-        const addBatch = db.batch();
-        questions.forEach((question) => {
-          const docRef = db.collection("questions").doc();
-          addBatch.set(docRef, question);
-        });
-        await addBatch.commit();
-        console.log("Questions imported to Firestore successfully");
-
-        // Update the stored hash with the new hash
-        await metadataRef.set({hash: newHash});
-        console.log("Updated metadata with new hash");
+        // Save updated metadata (all chapter hashes)
+        await metadataRef.set(metadata);
+        console.log("Updated metadata hashes for chapters:", chapters);
       } catch (error) {
         console.error("Error importing questions:", error);
       }

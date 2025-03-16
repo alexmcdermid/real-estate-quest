@@ -1,22 +1,54 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp } from "../config/firebaseConfig";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 const CACHE_KEY = "real-estate-quest";
-
+const STALE_TIME = 24 * 60 * 60 * 1000;
+ 
+/**
+ * Encodes a Unicode string to Base64.
+ * Uses encodeURIComponent to handle characters outside the Latin1 range.
+ *
+ * @param {any} cacheObject - The object to encode.
+ * @returns {string} - The Base64 encoded string.
+ */
 function encodeCache(cacheObject) {
-  return btoa(JSON.stringify(cacheObject));
+  const jsonStr = JSON.stringify(cacheObject);
+  return btoa(unescape(encodeURIComponent(jsonStr)));
 }
 
 function decodeCache(encodedString) {
   try {
-    return JSON.parse(atob(encodedString));
+    return JSON.parse(decodeURIComponent(escape(atob(encodedString))));
   } catch (error) {
     console.error("Error decoding cache:", error);
     return {};
   }
 }
 
+export function clearCache() {
+  localStorage.removeItem(CACHE_KEY);
+}
+
+function waitUntilUserIsReady() {
+  const auth = getAuth(firebaseApp);
+  console.log(auth.currentUser);
+  return new Promise((resolve) => {
+    // If already initialized, resolve immediately.
+    if (auth.currentUser !== null) {
+      resolve(auth.currentUser);
+    } else {
+      const unsubscribe = onAuthStateChanged(auth, (user) => {
+        unsubscribe();
+        resolve(user);
+      });
+    }
+  });
+}
+
 export async function fetchQuestionsByChapter(chapter = 1) {
+  await waitUntilUserIsReady();
+
   // Retrieve the entire cache from localStorage and decode it
   let cache = {};
   const cachedEncoded = localStorage.getItem(CACHE_KEY);
@@ -24,9 +56,9 @@ export async function fetchQuestionsByChapter(chapter = 1) {
     cache = decodeCache(cachedEncoded);
   }
 
-  // Return cached questions for the chapter if available
-  if (cache[chapter]) {
-    return cache[chapter];
+  // Check if the cache for this chapter exists and is still fresh
+  if (cache[chapter] && (Date.now() - cache[chapter].timestamp < STALE_TIME)) {
+    return cache[chapter].questions;
   }
 
   // Otherwise, fetch from the function
@@ -34,8 +66,12 @@ export async function fetchQuestionsByChapter(chapter = 1) {
   const getQuestionsByChapterCallable = httpsCallable(functions, "getQuestionsByChapter");
   try {
     const result = await getQuestionsByChapterCallable({ chapter });
+    console.log("qs" + result.data.questions[0]);
     // Update the cache object with the new data
-    cache[chapter] = result.data.questions;
+    cache[chapter] = {
+      timestamp: Date.now(),
+      questions: result.data.questions,
+    };
     // Encode and save the updated cache
     localStorage.setItem(CACHE_KEY, encodeCache(cache));
     return result.data.questions;

@@ -46,10 +46,12 @@
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { ref, watch, onMounted } from "vue";
+import { useAuth } from "../composables/useAuth";
 import { fetchQuestionsByChapter } from "../composables/useQuestion";
+const { authInitialized } = useAuth();
 
-const chapters = [1, 2, 3, 4];
+const chapters = [1, 2];
 const selectedChapter = ref(1);
 const questions = ref([]);
 
@@ -67,5 +69,16 @@ watch(selectedChapter, () => {
   loadQuestions();
 });
 
-loadQuestions();
+onMounted(() => {
+  if (authInitialized.value) {
+    loadQuestions();
+  } else {
+    const stopWatch = watch(authInitialized, (newVal) => {
+      if (newVal === true) {
+        loadQuestions();
+        stopWatch();
+      }
+    });
+  }
+});
 </script>
