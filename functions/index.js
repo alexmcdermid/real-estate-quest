@@ -34,6 +34,7 @@ export const getQuestionsByChapter = onCall(
     },
     async (data, context) => {
       let isPremium = false;
+      // TODO this is always undefined even tho we are logged in fe.
       console.log("Received context:", safeStringify(context));
       console.log("Received data:", safeStringify(data));
       if (context.auth && context.auth.uid) {

@@ -37,7 +37,7 @@
             </v-card>
           </v-col>
         </v-row>
-        <div v-if="!questions.length">
+        <div v-if="isLoading">
           Loading...
         </div>
       </v-col>
@@ -51,6 +51,7 @@ import { useAuth } from "../composables/useAuth";
 import { fetchQuestionsByChapter } from "../composables/useQuestion";
 const { authInitialized } = useAuth();
 
+let isLoading = true;
 const chapters = [1, 2];
 const selectedChapter = ref(1);
 const questions = ref([]);
@@ -59,8 +60,10 @@ async function loadQuestions() {
   try {
     const result = await fetchQuestionsByChapter(selectedChapter.value);
     questions.value = result;
+    isLoading = false;
     console.log("Loaded questions:", questions.value);
   } catch (error) {
+    isLoading = false;
     console.error("Error loading questions:", error);
   }
 }

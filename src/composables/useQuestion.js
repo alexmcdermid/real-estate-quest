@@ -66,7 +66,6 @@ export async function fetchQuestionsByChapter(chapter = 1) {
   const getQuestionsByChapterCallable = httpsCallable(functions, "getQuestionsByChapter");
   try {
     const result = await getQuestionsByChapterCallable({ chapter });
-    console.log("qs" + result.data.questions[0]);
     // Update the cache object with the new data
     cache[chapter] = {
       timestamp: Date.now(),
