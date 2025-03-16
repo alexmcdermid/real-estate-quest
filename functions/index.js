@@ -34,17 +34,30 @@ export const getQuestionsByChapter = onCall(
     },
     async (data, context) => {
       let isPremium = false;
-      // TODO this is always undefined even tho we are logged in fe.
       console.log("Received context:", safeStringify(context));
       console.log("Received data:", safeStringify(data));
+
+      // If context.auth is not set, try manually verifying idToken passed in data.data
+      if (!context.auth && data.data && data.data.idToken) {
+        try {
+          const decodedToken = await admin.auth().verifyIdToken(data.data.idToken);
+          context.auth = decodedToken;
+          console.log("Manually verified token, updated context.auth:", safeStringify(context.auth));
+        } catch (error) {
+          console.error("Error verifying manual token:", error);
+        }
+      }
+
       if (context.auth && context.auth.uid) {
         // Check if the authenticated user is a premium member.
         const memberSnap = await db.collection("members").doc(context.auth.uid).get();
-        console.log(memberSnap);
-        console.log(memberSnap.exists && memberSnap.data().member === true);
+        console.log("Member snapshot:", memberSnap);
+        console.log("Is premium:", memberSnap.exists && memberSnap.data().member === true);
         if (memberSnap.exists && memberSnap.data().member === true) {
           isPremium = true;
         }
+      } else {
+        console.log("No authenticated user detected.");
       }
 
       const chapter = parseInt(data.data?.chapter) || 1;

@@ -51,7 +51,7 @@ import { useAuth } from "../composables/useAuth";
 import { fetchQuestionsByChapter } from "../composables/useQuestion";
 const { authInitialized } = useAuth();
 
-let isLoading = true;
+const isLoading = ref(true);
 const chapters = [1, 2];
 const selectedChapter = ref(1);
 const questions = ref([]);
@@ -60,10 +60,10 @@ async function loadQuestions() {
   try {
     const result = await fetchQuestionsByChapter(selectedChapter.value);
     questions.value = result;
-    isLoading = false;
+    isLoading.value = false;
     console.log("Loaded questions:", questions.value);
   } catch (error) {
-    isLoading = false;
+    isLoading.value = false;
     console.error("Error loading questions:", error);
   }
 }

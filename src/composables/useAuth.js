@@ -9,23 +9,31 @@ export function useAuth() {
   const user = ref(null);
   const authInitialized = ref(false);
 
-  // Monitor auth state changes.
-  onAuthStateChanged(auth, (currentUser) => {
-    if (currentUser) {
-      isAuthenticated.value = true;
-      user.value = currentUser;
-    } else {
-      isAuthenticated.value = false;
-      user.value = null;
-    }
+  // Immediately check if a user is already signed in
+  if (auth.currentUser) {
+    isAuthenticated.value = true;
+    user.value = auth.currentUser;
     authInitialized.value = true;
-  });
+  } else {
+    // Set up the auth state listener
+    onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        isAuthenticated.value = true;
+        user.value = currentUser;
+      } else {
+        isAuthenticated.value = false;
+        user.value = null;
+      }
+      authInitialized.value = true;
+    });
+  }
 
   async function login() {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
       clearCache();
+      // Optionally, you may remove reload if using router navigation instead.
       window.location.reload();
     } catch (error) {
       console.error("Error during login:", error);
