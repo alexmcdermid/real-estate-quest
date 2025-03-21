@@ -20,21 +20,7 @@
             cols="12"
             md="6"
           >
-            <v-card outlined class="mb-4">
-              <v-card-title>
-                Q{{ q.questionNumber }}: {{ q.question }}
-              </v-card-title>
-              <v-card-text>
-                <v-list dense>
-                  <v-list-item
-                    v-for="(choice, index) in q.choices"
-                    :key="index"
-                  >
-                    <v-list-item-content>{{ choice }}</v-list-item-content>
-                  </v-list-item>
-                </v-list>
-              </v-card-text>
-            </v-card>
+            <QuestionCard :question="q"/>
           </v-col>
         </v-row>
         <div v-if="isLoading">
@@ -49,6 +35,7 @@
 import { ref, watch, onMounted } from "vue";
 import { useAuth } from "../composables/useAuth";
 import { fetchQuestionsByChapter } from "../composables/useQuestion";
+import QuestionCard from "./questionCard.vue";
 const { authInitialized } = useAuth();
 
 const isLoading = ref(true);

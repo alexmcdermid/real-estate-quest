@@ -1,5 +1,5 @@
 <template>
-  <v-app-bar app flat :color="navColor" :dark="isDark" :light="!isDark">
+  <v-app-bar app flat color="#0D3B66" :dark="isDark" :light="!isDark">
     <v-toolbar-title>
       real-estate-quest
     </v-toolbar-title>
@@ -43,9 +43,6 @@ import LoginModal from "./loginModal.vue";
 const { isDark, darkModeIcon, toggleDarkMode } = useDark();
 const { isAuthenticated, user, logout } = useAuth();
 const userPhotoURL = computed(() => user.value?.photoURL || "");
-
-const navColor = computed(() => (isDark.value ? "#0D3B66" : "#07575B"));
-
 const loginModal = ref(null);
 
 function openLoginModal() {
