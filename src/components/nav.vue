@@ -1,9 +1,14 @@
 <template>
-  <v-app-bar app flat color="primary" dark>
+  <v-app-bar app flat :color="navColor" :dark="isDark" :light="!isDark">
     <v-toolbar-title>
       real-estate-quest
     </v-toolbar-title>
     <v-spacer></v-spacer>
+    <!-- Dark/Light Mode Toggle -->
+    <v-btn icon @click="toggleDarkMode">
+      <v-icon>{{ darkModeIcon }}</v-icon>
+    </v-btn>
+    <!-- Right Side: Login Button or Profile Dropdown -->
     <div v-if="!isAuthenticated">
       <v-btn text @click="openLoginModal">Login</v-btn>
     </div>
@@ -32,11 +37,15 @@
 
 <script setup>
 import { ref, computed } from "vue";
+import useDark from "../composables/useDark";
 import { useAuth } from "../composables/useAuth";
 import LoginModal from "./loginModal.vue";
-
+const { isDark, darkModeIcon, toggleDarkMode } = useDark();
 const { isAuthenticated, user, logout } = useAuth();
 const userPhotoURL = computed(() => user.value?.photoURL || "");
+
+const navColor = computed(() => (isDark.value ? "#0D3B66" : "#07575B"));
+
 const loginModal = ref(null);
 
 function openLoginModal() {
