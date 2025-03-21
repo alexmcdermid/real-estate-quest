@@ -28,6 +28,7 @@ function decodeCache(encodedString) {
 
 export function clearCache() {
   localStorage.removeItem(CACHE_KEY);
+  window.location.reload();
 }
 
 /**

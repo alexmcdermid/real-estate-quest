@@ -1,5 +1,14 @@
 import { ref } from "vue";
-import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth";
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut,
+  sendSignInLinkToEmail,
+  isSignInWithEmailLink,
+  signInWithEmailLink
+} from "firebase/auth";
 import { firebaseApp } from "../config/firebaseConfig";
 import { clearCache } from "../composables/useQuestion";
 
@@ -18,18 +27,17 @@ export function useAuth() {
       isAuthenticated.value = false;
       user.value = null;
     }
-    console.log('else block'+user);
+    console.log("Auth state changed:", user.value);
     authInitialized.value = true;
   });
   
-  async function login() {
+  async function googlyLogin() {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
       clearCache();
-      window.location.reload();
     } catch (error) {
-      console.error("Error during login:", error);
+      console.error("Error during googly login:", error);
     }
   }
 
@@ -37,11 +45,51 @@ export function useAuth() {
     try {
       await signOut(auth);
       clearCache();
-      window.location.reload();
     } catch (error) {
       console.error("Error during logout:", error);
     }
   }
 
-  return { isAuthenticated, user, authInitialized, login, logout };
+  async function sendLoginEmailLink(email) {
+    // Configure the action code settings. Adjust the URL if needed.
+    const actionCodeSettings = {
+      url: window.location.href,
+      handleCodeInApp: true,
+    };
+    try {
+      await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+      // Save the email locally so it can be retrieved after the user clicks the link.
+      window.localStorage.setItem("emailForSignIn", email);
+    } catch (error) {
+      console.error("Error sending email link:", error);
+    }
+  }
+  
+  async function completeEmailLinkLogin() {
+    // Check if the current URL is a sign-in with email link.
+    if (isSignInWithEmailLink(auth, window.location.href)) {
+      // Retrieve the email from local storage (or prompt the user if not found)
+      let email = window.localStorage.getItem("emailForSignIn");
+      if (!email) {
+        return;
+      }
+      try {
+        await signInWithEmailLink(auth, email, window.location.href);
+        window.localStorage.removeItem("emailForSignIn");
+        clearCache();
+      } catch (error) {
+        console.error("Error completing email link login:", error);
+      }
+    }
+  }
+
+  return {
+    isAuthenticated,
+    user,
+    authInitialized,
+    googlyLogin,
+    logout,
+    sendLoginEmailLink,
+    completeEmailLinkLogin,
+  };
 }

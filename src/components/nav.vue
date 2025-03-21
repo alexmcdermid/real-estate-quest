@@ -1,12 +1,9 @@
 <template>
   <v-app-bar app flat color="primary" dark>
-    <!-- Home / Logo Section -->
     <v-toolbar-title>
       real-estate-quest
     </v-toolbar-title>
     <v-spacer></v-spacer>
-
-    <!-- Right Side: Login Button or Profile Dropdown -->
     <div v-if="!isAuthenticated">
       <v-btn text @click="openLoginModal">Login</v-btn>
     </div>
@@ -34,20 +31,14 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { ref, computed } from "vue";
 import { useAuth } from "../composables/useAuth";
 import LoginModal from "./loginModal.vue";
 
-// Get reactive auth properties and functions from your composable.
 const { isAuthenticated, user, logout } = useAuth();
-
-// For profile picture; use a default placeholder if none is available.
 const userPhotoURL = computed(() => user.value?.photoURL || "");
-
-// Create a ref for the login modal component.
 const loginModal = ref(null);
 
-// Trigger the open() method exposed by LoginModal.
 function openLoginModal() {
   if (loginModal.value && loginModal.value.open) {
     loginModal.value.open();
@@ -55,7 +46,6 @@ function openLoginModal() {
 }
 
 function goToProfile() {
-  // todo: implement vue router navigation to the profile page
   console.log("Navigating to profile");
 }
 </script>
