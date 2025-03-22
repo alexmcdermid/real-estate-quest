@@ -20,7 +20,7 @@
             cols="12"
             md="6"
           >
-            <QuestionCard :question="q"/>
+            <QuestionCard :question="q" :shuffled="shuffled"/>
           </v-col>
         </v-row>
         <div v-if="isLoading">
@@ -42,11 +42,12 @@ const isLoading = ref(true);
 const chapters = [1, 2];
 const selectedChapter = ref(1);
 const questions = ref([]);
+const shuffled = ref(true);
 
 async function loadQuestions() {
   try {
     const result = await fetchQuestionsByChapter(selectedChapter.value);
-    questions.value = result;
+    questions.value = shuffled.value ? shuffleArray(result) : result;
     isLoading.value = false;
     console.log("Loaded questions:", questions.value);
   } catch (error) {
@@ -71,4 +72,18 @@ onMounted(() => {
     });
   }
 });
+
+function shuffleArray(array) {
+  let currentIndex = array.length, randomIndex;
+
+  while (currentIndex !== 0) {
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex--;
+
+    [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+  }
+
+  return array;
+}
+
 </script>

@@ -1,6 +1,6 @@
 <template>
   <v-card outlined class="mb-4">
-    <v-card-title class="preformatted">
+    <v-card-title v-if="!shuffled" class="preformatted">
       Question {{ question.questionNumber }}
     </v-card-title>
     <!-- Display shared question text if provided -->
@@ -48,6 +48,10 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  shuffled: {
+    type: Boolean,
+    required: true
+  }
 })
 
 // Local state for selected answer and submission state.
