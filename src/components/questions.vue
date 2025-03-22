@@ -41,7 +41,7 @@ const { authInitialized } = useAuth();
 const { options } = useOptions();
 
 const isLoading = ref(true);
-const chapters = [1, 2];
+const chapters = [1, 2, 3, 4];
 const selectedChapter = ref(1);
 const questions = ref([]);
 const shuffled = computed(() => options.shuffled);
