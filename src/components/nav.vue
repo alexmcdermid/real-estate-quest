@@ -25,6 +25,9 @@
           <v-list-item @click="goToProfile">
             <v-list-item-title>Profile</v-list-item-title>
           </v-list-item>
+          <v-list-item @click="openOptionModal">
+            <v-list-item-title>Quiz Options</v-list-item-title>
+          </v-list-item>
           <v-list-item @click="logout">
             <v-list-item-title>Logout</v-list-item-title>
           </v-list-item>
@@ -33,6 +36,7 @@
     </div>
   </v-app-bar>
   <LoginModal ref="loginModal" />
+  <OptionModal ref="optionModal" />
 </template>
 
 <script setup>
@@ -40,14 +44,22 @@ import { ref, computed } from "vue";
 import useDark from "../composables/useDark";
 import { useAuth } from "../composables/useAuth";
 import LoginModal from "./loginModal.vue";
+import OptionModal from "./optionModal.vue";
 const { isDark, darkModeIcon, toggleDarkMode } = useDark();
 const { isAuthenticated, user, logout } = useAuth();
 const userPhotoURL = computed(() => user.value?.photoURL || "");
 const loginModal = ref(null);
+const optionModal = ref(null);
 
 function openLoginModal() {
   if (loginModal.value && loginModal.value.open) {
     loginModal.value.open();
+  }
+}
+
+function openOptionModal() {
+  if (optionModal.value && optionModal.value.open) {
+    optionModal.value.open();
   }
 }
 

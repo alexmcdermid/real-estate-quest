@@ -1,21 +1,22 @@
 import { computed } from 'vue'
 import { useTheme } from 'vuetify'
+import useOptions from './useOption'
 
 export default function useDark() {
   const theme = useTheme()
+  const { options } = useOptions()
 
-  const storedIsDark = localStorage.getItem("isDark")
-  if (storedIsDark !== null) {
-    theme.global.name.value = storedIsDark === "true" ? "dark" : "light"
-  }
+  theme.global.name.value = options.isDark ? "dark" : "light"
 
-  const isDark = computed(() => theme.global.name.value === "dark")
-  const darkModeIcon = computed(() => (isDark.value ? "mdi-weather-sunny" : "mdi-weather-night"))
+  const isDark = computed(() => options.isDark)
+  const darkModeIcon = computed(() =>
+    isDark.value ? "mdi-weather-sunny" : "mdi-weather-night"
+  )
 
   function toggleDarkMode() {
-    theme.global.name.value = isDark.value ? "light" : "dark"
-    localStorage.setItem("isDark", (!isDark.value).toString())
+    options.isDark = !options.isDark
+    theme.global.name.value = options.isDark ? "dark" : "light"
   }
 
-  return { isDark, darkModeIcon, toggleDarkMode }
+  return { isDark, darkModeIcon, toggleDarkMode, options }
 }

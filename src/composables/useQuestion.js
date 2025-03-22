@@ -1,9 +1,7 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp } from "../config/firebaseConfig";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-
-const CACHE_KEY = "real-estate-quest";
-const STALE_TIME = 24 * 60 * 60 * 1000;
+import { CACHE_KEY, STALE_TIME } from "../config/constants"
  
 /**
  * Encodes a Unicode string to Base64.
@@ -12,12 +10,12 @@ const STALE_TIME = 24 * 60 * 60 * 1000;
  * @param {any} cacheObject - The object to encode.
  * @returns {string} - The Base64 encoded string.
  */
-function encodeCache(cacheObject) {
+export function encodeCache(cacheObject) {
   const jsonStr = JSON.stringify(cacheObject);
   return btoa(unescape(encodeURIComponent(jsonStr)));
 }
 
-function decodeCache(encodedString) {
+export function decodeCache(encodedString) {
   try {
     return JSON.parse(decodeURIComponent(escape(atob(encodedString))));
   } catch (error) {

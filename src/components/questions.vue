@@ -32,22 +32,24 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from "vue";
+import { ref, watch, onMounted, computed } from "vue";
 import { useAuth } from "../composables/useAuth";
 import { fetchQuestionsByChapter } from "../composables/useQuestion";
 import QuestionCard from "./questionCard.vue";
+import useOptions from "../composables/useOption";
 const { authInitialized } = useAuth();
+const { options } = useOptions();
 
 const isLoading = ref(true);
 const chapters = [1, 2];
 const selectedChapter = ref(1);
 const questions = ref([]);
-const shuffled = ref(true);
+const shuffled = computed(() => options.shuffled);
 
 async function loadQuestions() {
   try {
     const result = await fetchQuestionsByChapter(selectedChapter.value);
-    questions.value = shuffled.value ? shuffleArray(result) : result;
+    questions.value = shuffled.value ? shuffleArray([...result]) : result;
     isLoading.value = false;
     console.log("Loaded questions:", questions.value);
   } catch (error) {
@@ -57,6 +59,10 @@ async function loadQuestions() {
 }
 
 watch(selectedChapter, () => {
+  loadQuestions();
+});
+
+watch(shuffled, () => {
   loadQuestions();
 });
 
