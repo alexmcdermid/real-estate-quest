@@ -8,7 +8,7 @@
           v-model="selectedChapter"
           outlined
           dense
-          class="mb-6"
+          class="mb-4"
         />
       </v-col>
       <v-col cols="12">
@@ -23,9 +23,10 @@
             <QuestionCard :question="q" :shuffled="shuffled"/>
           </v-col>
         </v-row>
-        <div v-if="isLoading">
-          Loading...
-        </div>
+        <v-card-text v-if="!isLoading && questions.length == 0" class="pl-0">
+          Nothing here - subscribe for access to hundreds of questions. 
+        </v-card-text>
+        <v-progress-linear v-if="isLoading" class="my-4" indeterminate />
       </v-col>
     </v-row>
   </v-container>

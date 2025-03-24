@@ -1,4 +1,4 @@
-import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {onCall} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import admin from "firebase-admin";
 import crypto from "crypto";
@@ -74,7 +74,8 @@ export const getQuestionsByChapter = onCall(
 
       const snapshot = await questionsQuery.get();
       if (snapshot.empty) {
-        throw new HttpsError("not-found", "No question found");
+        return {questions: []};
+        // throw new HttpsError("not-found", "No question found");
       }
 
       const questions = await Promise.all(

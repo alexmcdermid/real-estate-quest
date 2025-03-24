@@ -5,7 +5,7 @@
       <v-card-text>
         <!-- Googly Login Option -->
         <v-btn block color="primary" @click="handleGooglyLogin">
-          Sign in with Googly
+          Sign in with Google
         </v-btn>
         <v-divider class="my-4"></v-divider>
         <!-- Email Login Option -->

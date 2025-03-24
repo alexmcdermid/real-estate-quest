@@ -90,6 +90,6 @@ export async function fetchQuestionsByChapter(chapter = 1) {
     return result.data.questions;
   } catch (error) {
     console.error("Error fetching questions:", error);
-    throw error;
+    return error;
   }
 }
