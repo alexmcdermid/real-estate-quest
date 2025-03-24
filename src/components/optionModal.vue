@@ -29,6 +29,5 @@ function Close() {
   dialog.value = false;
 }
 
-import { defineExpose } from "vue";
 defineExpose({ open: () => (dialog.value = true) });
 </script>

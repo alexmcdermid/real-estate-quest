@@ -43,7 +43,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, defineExpose } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useAuth } from "../composables/useAuth";
 
 const dialog = ref(false);
