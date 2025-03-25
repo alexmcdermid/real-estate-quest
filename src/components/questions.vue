@@ -73,10 +73,12 @@ async function loadQuestions() {
 }
 
 watch(selectedChapter, () => {
+  isLoading.value = true;
   loadQuestions();
 });
 
 watch(shuffled, () => {
+  isLoading.value = true;
   loadQuestions();
 });
 
