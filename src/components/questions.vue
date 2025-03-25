@@ -14,19 +14,32 @@
       <v-col cols="12">
         <h2 class="mb-4">Quiz Questions (Chapter {{ selectedChapter }})</h2>
         <v-row>
-          <v-col
-            v-for="q in questions"
-            :key="q.id"
-            cols="12"
-            md="6"
-          >
-            <QuestionCard :question="q" :shuffled="shuffled"/>
-          </v-col>
+          <template v-if="isLoading">
+            <v-col
+              v-for="n in 4"
+              :key="n"
+              cols="12"
+              md="6"
+            >
+              <v-skeleton-loader
+                type="card, article, actions"
+              />
+            </v-col>
+          </template>
+          <template v-else>
+            <v-col
+              v-for="q in questions"
+              :key="q.id"
+              cols="12"
+              md="6"
+            >
+              <QuestionCard :question="q" :shuffled="shuffled"/>
+            </v-col>
+          </template>
         </v-row>
         <v-card-text v-if="!isLoading && questions.length == 0" class="pl-0">
           Nothing here - subscribe for access to hundreds of questions. 
         </v-card-text>
-        <v-progress-linear v-if="isLoading" class="my-4" indeterminate />
       </v-col>
     </v-row>
   </v-container>
