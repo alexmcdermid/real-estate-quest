@@ -2,7 +2,7 @@
   <v-container>
     <v-row>
       <v-col cols="12" class="d-flex align-items-center justify-space-between">
-        <h2 class="mb-4">Quiz Questions (Chapter {{ selectedChapter }})</h2>
+        <h2>Quiz Questions (Chapter {{ selectedChapter }})</h2>
         <v-btn
           v-if="hasCompletedQuestions"
           color="error"
