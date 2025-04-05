@@ -1,7 +1,7 @@
 <template>
   <v-app-bar app flat color="#0D3B66" :dark="isDark" :light="!isDark">
     <!-- Left-aligned navigation -->
-    <v-btn text class="nav-text" @click="navigateTo('/')">
+    <v-btn icon class="nav-text" @click="navigateTo('/')">
       <v-icon>mdi-home</v-icon>
     </v-btn>
 
@@ -9,8 +9,12 @@
     <v-btn text class="nav-link" @click="navigateTo('/questions')">
       <span>Questions</span>
     </v-btn>
-    
+
     <v-spacer />
+
+    <v-btn icon class="nav-link" @click="navigateTo('/profile')">
+      <span>Pro</span>
+    </v-btn>
 
     <!-- Dark/Light Mode Toggle -->
     <v-btn icon @click="toggleDarkMode">
@@ -31,9 +35,6 @@
           </v-btn>
         </template>
         <v-list>
-          <v-list-item @click="navigateTo('/profile')">
-            <v-list-item-title>Profile</v-list-item-title>
-          </v-list-item>
           <v-list-item @click="openOptionModal">
             <v-list-item-title>Quiz Options</v-list-item-title>
           </v-list-item>
