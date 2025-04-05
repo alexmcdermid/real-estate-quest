@@ -28,18 +28,15 @@
           </template>
           <template v-else>
             <v-col
-              v-for="q in questions"
-              :key="q.id"
+              v-for="(item, index) in questionsWithProCard"
+              :key="index"
               cols="12"
               md="6"
             >
-              <QuestionCard :question="q" :shuffled="shuffled"/>
+              <component :is="item.component" v-bind="item.props" />
             </v-col>
           </template>
         </v-row>
-        <div v-if="!isLoading && questions.length == 0" class="mt-4">
-          <ProCard />
-        </div>
       </v-col>
     </v-row>
   </v-container>
@@ -60,6 +57,24 @@ const isLoading = ref(true);
 const selectedChapter = ref(1);
 const questions = ref([]);
 const shuffled = computed(() => options.shuffled);
+
+// Dynamically add ProCard in the middle if questions are fewer than 10
+const questionsWithProCard = computed(() => {
+  const questionItems = questions.value.map((q) => ({
+    component: QuestionCard,
+    props: { question: q, shuffled: shuffled.value },
+  }));
+
+  if (questions.value.length < 10) {
+    const middleIndex = Math.floor(questionItems.length / 2); // Insert in the middle
+    questionItems.splice(middleIndex, 0, {
+      component: ProCard,
+      props: {},
+    });
+  }
+
+  return questionItems;
+});
 
 async function loadQuestions() {
   try {

@@ -1,15 +1,21 @@
 <template>
-  <v-card
-    outlined
-    class="clickable-card pro-card"
-    @click="$router.push('/pro')"
-  >
-    <v-card-title>
-      <span>Upgrade to <span class="pro-highlight">Pro</span></span>
+  <v-card outlined class="mb-4 pro-card clickable-card" @click="$router.push('/pro')">
+    <!-- Title Section -->
+    <v-card-title class="preformatted">
+      Unlock Pro Features
     </v-card-title>
+    <!-- Description Section -->
     <v-card-text>
-      <p>Unlock hundreds of high-quality practice questions and powerful study tools to help you pass your BC Real Estate Licensing Exam on the first try!</p>
+      <span class="questionText">
+        Upgrade to <span class="pro-highlight">Pro</span> to access hundreds of high-quality practice questions, detailed explanations, and powerful study tools to help you pass your BC Real Estate Licensing Exam on the first try!
+      </span>
     </v-card-text>
+    <!-- Call-to-Action Section -->
+    <v-card-actions>
+      <v-btn color="primary" class="mt-4" block>
+        Learn More
+      </v-btn>
+    </v-card-actions>
   </v-card>
 </template>
 
@@ -38,5 +44,14 @@ const router = useRouter();
   color: #1976D2;
   font-weight: bold;
   text-decoration: underline;
+}
+
+.questionText {
+  font-size: 16px;
+}
+
+.preformatted {
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 </style>
