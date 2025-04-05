@@ -1,6 +1,17 @@
 <template>
   <v-container>
     <v-row>
+      <v-col cols="12" class="d-flex align-items-center justify-space-between">
+        <h2 class="mb-4">Quiz Questions (Chapter {{ selectedChapter }})</h2>
+        <v-btn
+          v-if="hasCompletedQuestions"
+          color="error"
+          outlined
+          @click="resetAllQuestions"
+        >
+          Reset All
+        </v-btn>
+      </v-col>
       <v-col cols="12">
         <v-select
           :items="chapters"
@@ -12,7 +23,6 @@
         />
       </v-col>
       <v-col cols="12">
-        <h2 class="mb-4">Quiz Questions (Chapter {{ selectedChapter }})</h2>
         <v-row>
           <template v-if="isLoading">
             <v-col
@@ -33,7 +43,12 @@
               cols="12"
               md="6"
             >
-              <component :is="item.component" v-bind="item.props" />
+              <component
+                :is="item.component"
+                v-bind="item.props"
+                @questionCompleted="markQuestionCompleted(index)"
+                @questionReset="markQuestionReset(index)"
+              />
             </v-col>
           </template>
         </v-row>
@@ -50,19 +65,27 @@ import QuestionCard from "./questionCard.vue";
 import ProCard from "./proCard.vue";
 import useOptions from "../composables/useOption";
 import { chapters } from "@/constants/chapters";
+
 const { authInitialized } = useAuth();
 const { options } = useOptions();
 
 const isLoading = ref(true);
 const selectedChapter = ref(1);
 const questions = ref([]);
+const completedQuestions = ref(new Set()); // Track completed questions
 const shuffled = computed(() => options.shuffled);
+const resetAll = ref(false); // Reactive property to trigger reset
 
 // Dynamically add ProCard in the middle if questions are fewer than 10
 const questionsWithProCard = computed(() => {
-  const questionItems = questions.value.map((q) => ({
+  const questionItems = questions.value.map((q, index) => ({
     component: QuestionCard,
-    props: { question: q, shuffled: shuffled.value },
+    props: {
+      question: q,
+      shuffled: shuffled.value,
+      questionIndex: index,
+      resetAll: resetAll.value,
+    },
   }));
 
   if (questions.value.length < 10) {
@@ -75,6 +98,27 @@ const questionsWithProCard = computed(() => {
 
   return questionItems;
 });
+
+// Check if at least one question is completed
+const hasCompletedQuestions = computed(() => completedQuestions.value.size > 0);
+
+// Mark a question as completed
+function markQuestionCompleted(index) {
+  completedQuestions.value.add(index);
+}
+
+// Mark a question as reset
+function markQuestionReset(index) {
+  completedQuestions.value.delete(index);
+}
+
+// Reset all questions
+function resetAllQuestions() {
+  resetAll.value = true; // Trigger reset in all child components
+  setTimeout(() => {
+    resetAll.value = false; // Reset the flag after the reset is complete
+  }, 0);
+}
 
 async function loadQuestions() {
   try {
@@ -112,16 +156,19 @@ onMounted(() => {
 });
 
 function shuffleArray(array) {
-  let currentIndex = array.length, randomIndex;
+  let currentIndex = array.length,
+    randomIndex;
 
   while (currentIndex !== 0) {
     randomIndex = Math.floor(Math.random() * currentIndex);
     currentIndex--;
 
-    [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+    [array[currentIndex], array[randomIndex]] = [
+      array[randomIndex],
+      array[currentIndex],
+    ];
   }
 
   return array;
 }
-
 </script>

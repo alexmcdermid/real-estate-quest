@@ -11,11 +11,15 @@
       </span>
     </v-card-text>
     <!-- Call-to-Action Section -->
-    <v-card-actions>
-      <v-btn color="primary" class="mt-4" block>
+    <v-card-text>
+      <v-btn
+        color="primary"
+        class="mt-4"
+        block
+      >
         Learn More
       </v-btn>
-    </v-card-actions>
+    </v-card-text>
   </v-card>
 </template>
 
