@@ -85,23 +85,23 @@ export const getQuestionsByChapter = onCall(
             plainQuestion.id = doc.id;
 
             // If sharedQuestionText is provided, fetch its document data.
-            if (
-              questionData.sharedQuestionText &&
-          questionData.sharedQuestionText._path &&
-          Array.isArray(questionData.sharedQuestionText._path.segments) &&
-          questionData.sharedQuestionText._path.segments.length >= 2
-            ) {
-              const sharedDocId =
-            questionData.sharedQuestionText._path.segments[1];
-              const sharedDocSnap = await db
-                  .collection("sharedQuestionText")
-                  .doc(sharedDocId)
-                  .get();
-              if (sharedDocSnap.exists) {
-                plainQuestion.sharedQuestionText =
-              sharedDocSnap.data().text;
-              }
-            }
+            //   if (
+            //     questionData.sharedQuestionText &&
+            // questionData.sharedQuestionText._path &&
+            // Array.isArray(questionData.sharedQuestionText._path.segments) &&
+            // questionData.sharedQuestionText._path.segments.length >= 2
+            //   ) {
+            //     const sharedDocId =
+            //   questionData.sharedQuestionText._path.segments[1];
+            //     const sharedDocSnap = await db
+            //         .collection("sharedQuestionText")
+            //         .doc(sharedDocId)
+            //         .get();
+            //     if (sharedDocSnap.exists) {
+            //       plainQuestion.sharedQuestionText =
+            //     sharedDocSnap.data().text;
+            //     }
+            //   }
 
             return plainQuestion;
           }),
