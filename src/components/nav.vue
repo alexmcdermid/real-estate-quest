@@ -23,7 +23,7 @@
 
     <!-- Right Side: Login Button or Profile Dropdown -->
     <div v-if="!isAuthenticated">
-      <v-btn text @click="openLoginModal">Login</v-btn>
+      <v-btn text class="nav-link" @click="openLoginModal">Login</v-btn>
     </div>
     <div v-else>
       <v-menu offset-y>
