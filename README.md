@@ -26,5 +26,10 @@ firebase deploy --only functions
 npm run lint:fix - in functions folder
 ```
 
+### firebase deploy fe
+```
+firebase deploy --only hosting
+```
+
 ### Customize configuration
 See [Configuration Reference](https://cli.vuejs.org/config/).
