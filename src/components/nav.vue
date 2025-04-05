@@ -30,7 +30,7 @@
         <template #activator="{ props }">
           <v-btn icon v-bind="props">
             <v-avatar>
-              <img :src="userPhotoURL" alt="Profile" />
+              <img :src="userPhotoURL" />
             </v-avatar>
           </v-btn>
         </template>
@@ -56,10 +56,11 @@ import useDark from "../composables/useDark";
 import { useAuth } from "../composables/useAuth";
 import LoginModal from "./loginModal.vue";
 import OptionModal from "./optionModal.vue";
+import defaultAvatar from "@/assets/default-avatar.png";
 
 const { isDark, darkModeIcon, toggleDarkMode } = useDark();
 const { isAuthenticated, user, logout } = useAuth();
-const userPhotoURL = computed(() => user.value?.photoURL || "");
+const userPhotoURL = computed(() => user.value?.photoURL || defaultAvatar);
 const loginModal = ref(null);
 const optionModal = ref(null);
 
@@ -94,7 +95,7 @@ function navigateTo(path) {
 }
 
 .nav-text {
-  font-size: 1.25rem;
+  font-size: 1rem;
   color: white;
 }
 
@@ -108,7 +109,15 @@ function navigateTo(path) {
   color: #FFD700;
 }
 
-.v-toolbar-title img {
-  vertical-align: middle;
+.v-avatar img {
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+}
+
+.v-avatar {
+  width: 36px;
+  height: 36px;
 }
 </style>
