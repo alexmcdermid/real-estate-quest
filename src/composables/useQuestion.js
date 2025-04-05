@@ -25,7 +25,16 @@ export function decodeCache(encodedString) {
 }
 
 export function clearCache() {
-  localStorage.removeItem(CACHE_KEY);
+  const cachedEncoded = localStorage.getItem(CACHE_KEY);
+  let cache = {};
+
+  if (cachedEncoded) {
+    cache = decodeCache(cachedEncoded);
+  }
+
+  const preservedOptions = cache.options || {};
+  localStorage.setItem(CACHE_KEY, encodeCache({ options: preservedOptions }));
+
   window.location.reload();
 }
 

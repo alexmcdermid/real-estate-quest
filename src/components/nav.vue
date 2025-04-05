@@ -1,13 +1,22 @@
 <template>
   <v-app-bar app flat color="#0D3B66" :dark="isDark" :light="!isDark">
-    <v-toolbar-title>
-      real-estate-quest
-    </v-toolbar-title>
-    <v-spacer></v-spacer>
+    <!-- Left-aligned navigation -->
+    <v-btn text class="nav-text" @click="navigateTo('/')">
+      <v-icon>mdi-home</v-icon>
+    </v-btn>
+
+    <!-- Centered Questions Button -->
+    <v-btn text class="nav-link" @click="navigateTo('/questions')">
+      <span>Questions</span>
+    </v-btn>
+    
+    <v-spacer />
+
     <!-- Dark/Light Mode Toggle -->
     <v-btn icon @click="toggleDarkMode">
       <v-icon>{{ darkModeIcon }}</v-icon>
     </v-btn>
+
     <!-- Right Side: Login Button or Profile Dropdown -->
     <div v-if="!isAuthenticated">
       <v-btn text @click="openLoginModal">Login</v-btn>
@@ -22,7 +31,7 @@
           </v-btn>
         </template>
         <v-list>
-          <v-list-item @click="goToProfile">
+          <v-list-item @click="navigateTo('/profile')">
             <v-list-item-title>Profile</v-list-item-title>
           </v-list-item>
           <v-list-item @click="openOptionModal">
@@ -40,11 +49,13 @@
 </template>
 
 <script setup>
+import { useRouter } from 'vue-router';
 import { ref, computed } from "vue";
 import useDark from "../composables/useDark";
 import { useAuth } from "../composables/useAuth";
 import LoginModal from "./loginModal.vue";
 import OptionModal from "./optionModal.vue";
+
 const { isDark, darkModeIcon, toggleDarkMode } = useDark();
 const { isAuthenticated, user, logout } = useAuth();
 const userPhotoURL = computed(() => user.value?.photoURL || "");
@@ -63,12 +74,39 @@ function openOptionModal() {
   }
 }
 
-function goToProfile() {
-  console.log("Navigating to profile");
+const router = useRouter();
+function navigateTo(path) {
+  router.push(path);
 }
 </script>
 
 <style scoped>
+.nav-title {
+  display: flex;
+  align-items: center;
+}
+
+.nav-icon {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.nav-text {
+  font-size: 1.25rem;
+  color: white;
+}
+
+.nav-link {
+  font-size: 1rem;
+  color: white;
+  text-transform: none;
+}
+
+.nav-link:hover {
+  color: #FFD700;
+}
+
 .v-toolbar-title img {
   vertical-align: middle;
 }
