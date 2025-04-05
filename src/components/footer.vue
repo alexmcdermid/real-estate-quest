@@ -1,20 +1,22 @@
 <template>
   <v-footer class="footer">
     <v-container>
-      <v-row justify="space-between" align="center">
+      <v-row justify="space-between">
+        <!-- Copyright -->
+        <v-col cols="12" md="6" class="text-md-start text-center">
+          <span class="copyright">
+            Copyright © 2025 Real Estate Quest. All rights reserved.
+          </span>
+        </v-col>
+
         <!-- Legal Links -->
-        <v-col cols="12" md="6" class="legal-links">
+        <v-col cols="12" md="6" class="legal-links text-md-end text-center">
           <a href="/privacy-policy" class="footer-link">Privacy Policy</a>
           <span>|</span>
           <a href="/terms-of-service" class="footer-link">Terms of Service</a>
         </v-col>
 
-        <!-- Copyright -->
-        <v-col cols="12" md="6" class="text-md-end text-center">
-          <span class="copyright">
-            Copyright © 2025 Real Estate Quest. All rights reserved.
-          </span>
-        </v-col>
+
       </v-row>
     </v-container>
   </v-footer>
