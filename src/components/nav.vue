@@ -12,7 +12,7 @@
 
     <v-spacer />
 
-    <v-btn icon class="nav-link" @click="navigateTo('/profile')">
+    <v-btn icon class="nav-link" @click="navigateTo('/pro')">
       <span>Pro</span>
     </v-btn>
 

@@ -5,7 +5,7 @@ import QuestionsPage from './components/questions.vue';
 
 const routes = [
   { path: '/', component: LandingPage },
-  { path: '/profile', component: ProfilePage },
+  { path: '/pro', component: ProfilePage },
   { path: '/questions', component: QuestionsPage },
 ];
 

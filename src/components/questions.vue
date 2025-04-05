@@ -37,9 +37,9 @@
             </v-col>
           </template>
         </v-row>
-        <v-card-text v-if="!isLoading && questions.length == 0" class="pl-0">
-          Nothing here - subscribe for access to hundreds of questions. 
-        </v-card-text>
+        <div v-if="!isLoading && questions.length == 0" class="mt-4">
+          <ProCard />
+        </div>
       </v-col>
     </v-row>
   </v-container>
@@ -50,6 +50,7 @@ import { ref, watch, onMounted, computed } from "vue";
 import { useAuth } from "../composables/useAuth";
 import { fetchQuestionsByChapter } from "../composables/useQuestion";
 import QuestionCard from "./questionCard.vue";
+import ProCard from "./proCard.vue";
 import useOptions from "../composables/useOption";
 import { chapters } from "@/constants/chapters";
 const { authInitialized } = useAuth();
