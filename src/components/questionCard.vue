@@ -5,10 +5,10 @@
     </v-card-title>
     <!-- Display shared question text if provided -->
     <v-card-subtitle v-if="sharedText" >
-      <div v-html="formattedSharedText"></div>
+      <span v-html="formattedSharedText"></span>
     </v-card-subtitle>
     <v-card-text>
-      <div class="questionText" v-html="formattedQuestion"></div>
+      <span class="questionText" v-html="formattedQuestion"></span>
     </v-card-text>
     <v-card-text>
       <v-radio-group v-model="selectedChoice" mandatory :disabled="submitted">
@@ -34,7 +34,7 @@
         <v-alert :type="isCorrect ? 'success' : 'error'" border="start" elevation="2">
           {{ isCorrect ? 'Correct!' : 'Incorrect.' }}
         </v-alert>
-        <p class="mt-2"><strong>Explanation:</strong> {{ question.explanation }}</p>
+        <p class="mt-2"><strong>Explanation: </strong><span v-html="formattedExplanation"></span></p>
       </div>
     </v-card-text>
   </v-card>
@@ -76,6 +76,11 @@ const formattedQuestion = computed(() => {
 
 const formattedSharedText = computed(() => {
   return sharedText.value ? sharedText.value.replace(/\n/g, '<br>') : ''
+})
+
+const formattedExplanation = computed(() => {
+  return props.question.explanation
+    .replace(/\*\*(.*?)\*\*/g, '<i><b>$1</b></i>')
 })
 
 // Returns a label based on the index (A, B, C, D, ...).
