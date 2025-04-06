@@ -64,12 +64,9 @@ export async function fetchQuestionsByChapter(chapter = 1) {
   if (user) {
     try {
       idToken = await user.getIdToken(false); // forceRefresh=false
-      console.log("Manually retrieved ID token:", idToken);
     } catch (err) {
       console.error("Error retrieving ID token:", err);
     }
-  } else {
-    console.log("No user is signed in");
   }
 
   // Retrieve the entire cache from localStorage and decode it

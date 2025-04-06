@@ -27,7 +27,6 @@ export function useAuth() {
       isAuthenticated.value = false;
       user.value = null;
     }
-    console.log("Auth state changed:", user.value);
     authInitialized.value = true;
   });
   

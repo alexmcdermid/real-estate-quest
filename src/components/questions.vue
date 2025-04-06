@@ -125,7 +125,6 @@ async function loadQuestions() {
     const result = await fetchQuestionsByChapter(selectedChapter.value);
     questions.value = shuffled.value ? shuffleArray([...result]) : result;
     isLoading.value = false;
-    console.log("Loaded questions:", questions.value);
   } catch (error) {
     isLoading.value = false;
     console.error("Error loading questions:", error);
