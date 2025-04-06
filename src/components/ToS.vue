@@ -106,7 +106,7 @@ li {
   margin-bottom: 0.5em;
 }
 a {
-  color: inherit; /* theme color */
+  color: inherit;
   text-decoration: underline;
 }
 p {
