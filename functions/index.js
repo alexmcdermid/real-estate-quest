@@ -1,10 +1,19 @@
-import {onCall} from "firebase-functions/v2/https";
+import {onCall, onRequest} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
+import {defineSecret} from "firebase-functions/params";
 import admin from "firebase-admin";
 import crypto from "crypto";
+import Stripe from "stripe"; // Import Stripe
 
 admin.initializeApp();
 const db = admin.firestore();
+
+// Define secrets for Stripe keys
+const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY"); // Use defineSecret for secure key management
+const stripeWebhookSecret = defineSecret("STRIPE_WEBHOOK_SECRET"); // Define secret for Stripe webhook secret
+
+// Initialize Stripe (lazy initialization in functions)
+let stripe;
 
 /**
  * Safely stringifies an object by omitting circular references.
@@ -193,5 +202,155 @@ export const importQuestionsFromRepo = onSchedule(
       } catch (error) {
         console.error("Error importing questions:", error);
       }
+    },
+);
+
+export const createCheckoutSession = onCall(
+    {
+      region: "us-west1",
+      enforceAppCheck: true,
+      secrets: [stripeSecretKey],
+    },
+    async (data, context) => {
+      let userId = null;
+
+      console.log("Received context:", safeStringify(context));
+      console.log("Received data:", safeStringify(data));
+
+      // If context.auth is not set, try manually verifying idToken passed in data.data
+      if (!context.auth && data.data && data.data.idToken) {
+        try {
+          const decodedToken = await admin.auth().verifyIdToken(data.data.idToken);
+          context.auth = decodedToken;
+          console.log("Manually verified token, updated context.auth:", safeStringify(context.auth));
+        } catch (error) {
+          console.error("Error verifying manual token:", error);
+          throw new Error("Authentication required");
+        }
+      }
+
+      if (context.auth && context.auth.uid) {
+        userId = context.auth.uid;
+      } else {
+        console.log("No authenticated user detected.");
+        throw new Error("Authentication required");
+      }
+
+      const {priceId, successUrl, cancelUrl} = data.data;
+
+      // Initialize Stripe with the secret key
+      stripe = stripe || new Stripe(stripeSecretKey.value());
+
+      console.log("Creating Stripe Checkout session with:", {
+        payment_method_types: ["card"],
+        mode: "subscription",
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        metadata: {
+          userId,
+        },
+      });
+
+      try {
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ["card"],
+          mode: "subscription",
+          line_items: [
+            {
+              price: priceId,
+              quantity: 1,
+            },
+          ],
+          success_url: successUrl,
+          cancel_url: cancelUrl,
+          metadata: {
+            userId, // Store the user's UID for later reference
+          },
+        });
+
+        // Return the session URL instead of the session ID
+        return {url: session.url};
+      } catch (error) {
+        console.error("Error creating Stripe Checkout session:", error);
+        throw new Error("Failed to create Stripe Checkout session");
+      }
+    },
+);
+
+export const handleStripeWebhook = onRequest(
+    {
+      region: "us-west1",
+      enforceAppCheck: true,
+      secrets: [stripeWebhookSecret],
+    },
+    async (req, res) => {
+      const sig = req.headers["stripe-signature"];
+      let event;
+
+      try {
+        event = stripe.webhooks.constructEvent(req.rawBody, sig, stripeWebhookSecret.value());
+      } catch (err) {
+        console.error("Webhook signature verification failed:", err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+      }
+
+      switch (event.type) {
+        case "checkout.session.completed": {
+          const session = event.data.object;
+          const userId = session.metadata.userId;
+
+          // Determine subscription type (Monthly or Lifetime) based on priceId or metadata
+          const subscriptionType = session.metadata.subscriptionType || "Monthly"; // Default to Monthly
+          console.log(`Subscription type for user ${userId}: ${subscriptionType}`);
+
+          // Update Firestore with the user's subscription status
+          await db.collection("members").doc(userId).set(
+              {
+                member: true,
+                subscriptionId: session.subscription,
+                status: "active",
+                subscriptionType, // Store the subscription type in Firestore
+              },
+              {merge: true},
+          );
+
+          // Set custom claims with proStatus
+          await admin.auth().setCustomUserClaims(userId, {member: true, proStatus: subscriptionType});
+          console.log(`Subscription activated for user: ${userId} with proStatus: ${subscriptionType}`);
+          break;
+        }
+
+        case "customer.subscription.deleted":
+        case "invoice.payment_failed": {
+          const subscription = event.data.object;
+          const userId = subscription.metadata.userId;
+
+          // Update Firestore to mark the subscription as inactive
+          await db.collection("members").doc(userId).set(
+              {
+                member: false,
+                status: "inactive",
+                subscriptionType: null, // Clear subscription type
+              },
+              {merge: true},
+          );
+
+          // Remove proStatus from custom claims
+          await admin.auth().setCustomUserClaims(userId, {member: false, proStatus: null});
+          console.log(`Subscription marked inactive for user: ${userId}`);
+          break;
+        }
+
+        default:
+          console.log(`Unhandled event type: ${event.type}`);
+      }
+
+      res.status(200).send("Webhook received");
     },
 );

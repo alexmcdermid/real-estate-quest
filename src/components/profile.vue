@@ -56,6 +56,7 @@
       </v-card-text>
     </v-card>
 
+    <!-- Display Pro Status -->
     <template v-if="isAuthenticated && subscriptionStatus">
       <template v-if="subscriptionStatus === 'Lifetime'">
         <v-card class="mb-4">
@@ -90,43 +91,50 @@
   </v-container>
 
   <LoginModal ref="loginModal" />
-  <OptionModal ref="subscriptionModal" />
 </template>
 
 <script setup>
 import { ref } from "vue";
 import { useAuth } from "../composables/useAuth";
+import useMembership from "../composables/useMembership";
 import LoginModal from "./loginModal.vue";
-import OptionModal from "./optionModal.vue";
 
-const { isAuthenticated } = useAuth();
-const subscriptionStatus = ref(null); // Replace with actual subscription logic
+const { isAuthenticated, isPro, proStatus } = useAuth();
+const { startCheckout } = useMembership();
+
+const subscriptionStatus = ref(null); // Tracks the user's subscription status
 const loginModal = ref(null);
 const subscriptionModal = ref(null);
 
+// Open the login modal
 function openLoginModal() {
   if (loginModal.value && loginModal.value.open) {
     loginModal.value.open();
   }
 }
 
-function openSubscriptionModal() {
-  if (subscriptionModal.value && subscriptionModal.value.open) {
-    subscriptionModal.value.open();
-  }
-}
-
+// Handle subscription click
 function handleSubscriptionClick(type) {
   if (!isAuthenticated.value) {
     openLoginModal();
   } else {
-    console.log(`Open subscription modal for ${type}`);
-    openSubscriptionModal();
+    if (type === "monthly") {
+      startCheckout("price_1RAZfIDHHGtkTOPhKGMMIQGn"); // Replace with your actual Stripe price ID for monthly
+    } else if (type === "lifetime") {
+      startCheckout("price_1RAZgSDHHGtkTOPhyhqr29ai"); // Replace with your actual Stripe price ID for lifetime
+    }
   }
 }
 
+// Manage subscription (redirect to Stripe customer portal)
 function manageSubscription() {
   console.log("Redirect to subscription management");
+  // Implement logic to redirect to Stripe's customer portal
+}
+
+// Watch for changes in `isPro` to update subscription status
+if (isPro) {
+  subscriptionStatus.value = isPro;
 }
 </script>
 
