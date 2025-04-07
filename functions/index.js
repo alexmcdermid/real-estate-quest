@@ -41,80 +41,57 @@ export const getQuestionsByChapter = onCall(
       region: "us-west1",
       enforceAppCheck: true,
     },
-    async (data, context) => {
+
+    async (request) => {
       let isPremium = false;
-      console.log("Received context:", safeStringify(context));
-      console.log("Received data:", safeStringify(data));
+      const authContext = request.auth;
 
-      // If context.auth is not set, try manually verifying idToken passed in data.data
-      if (!context.auth && data.data && data.data.idToken) {
-        try {
-          const decodedToken = await admin.auth().verifyIdToken(data.data.idToken);
-          context.auth = decodedToken;
-          console.log("Manually verified token, updated context.auth:", safeStringify(context.auth));
-        } catch (error) {
-          console.error("Error verifying manual token:", error);
-        }
-      }
+      console.log("getQuestionsByChapter: Auth context received:", safeStringify(authContext));
+      console.log("getQuestionsByChapter: Data received:", safeStringify(request.data));
 
-      if (context.auth && context.auth.uid) {
-        // Check if the authenticated user is a premium member.
-        const memberSnap = await db.collection("members").doc(context.auth.uid).get();
-        console.log("Member snapshot:", memberSnap);
-        console.log("Is premium:", memberSnap.exists && memberSnap.data().member === true);
-        if (memberSnap.exists && memberSnap.data().member === true) {
+      if (authContext && authContext.uid) {
+        const proStatus = authContext.token?.proStatus;
+        console.log(`User ${authContext.uid} - checking proStatus claim: '${proStatus}'`);
+
+        if (proStatus === "Monthly" || proStatus === "Lifetime") {
           isPremium = true;
+          console.log(`User ${authContext.uid} IS premium.`);
+        } else {
+          isPremium = false;
+          console.log(`User ${authContext.uid} is NOT premium.`);
         }
       } else {
-        console.log("No authenticated user detected.");
+        console.log("No authenticated user detected in context.");
+        isPremium = false;
       }
 
-      const chapter = parseInt(data.data?.chapter) || 1;
-      console.log("chapter" + chapter);
+      const chapter = parseInt(request.data?.chapter) || 1;
+      console.log(`Workspaceing questions for chapter: ${chapter} (Premium: ${isPremium})`);
 
       let questionsQuery = db.collection("questions")
           .where("chapter", "==", chapter);
 
       if (!isPremium) {
+        console.log("Querying non-premium questions only.");
         questionsQuery = questionsQuery.where("premium", "==", false).orderBy("questionNumber");
       } else {
+        console.log("Querying all questions for premium user.");
         questionsQuery = questionsQuery.orderBy("questionNumber");
       }
 
       const snapshot = await questionsQuery.get();
+
       if (snapshot.empty) {
+        console.log(`No questions found for chapter ${chapter} matching criteria.`);
         return {questions: []};
-        // throw new HttpsError("not-found", "No question found");
       }
 
-      const questions = await Promise.all(
-          snapshot.docs.map(async (doc) => {
-            const questionData = doc.data();
-            const plainQuestion = JSON.parse(JSON.stringify(questionData));
-            plainQuestion.id = doc.id;
-
-            // If sharedQuestionText is provided, fetch its document data.
-            //   if (
-            //     questionData.sharedQuestionText &&
-            // questionData.sharedQuestionText._path &&
-            // Array.isArray(questionData.sharedQuestionText._path.segments) &&
-            // questionData.sharedQuestionText._path.segments.length >= 2
-            //   ) {
-            //     const sharedDocId =
-            //   questionData.sharedQuestionText._path.segments[1];
-            //     const sharedDocSnap = await db
-            //         .collection("sharedQuestionText")
-            //         .doc(sharedDocId)
-            //         .get();
-            //     if (sharedDocSnap.exists) {
-            //       plainQuestion.sharedQuestionText =
-            //     sharedDocSnap.data().text;
-            //     }
-            //   }
-
-            return plainQuestion;
-          }),
-      );
+      console.log(`Found ${snapshot.docs.length} questions.`);
+      const questions = snapshot.docs.map((doc) => {
+        const questionData = doc.data();
+        questionData.id = doc.id;
+        return questionData;
+      });
 
       return {questions: questions};
     },

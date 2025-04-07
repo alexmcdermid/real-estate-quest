@@ -38,37 +38,7 @@ export function clearCache() {
   window.location.reload();
 }
 
-/**
- * Returns a Promise that resolves with the currentUser
- * once the authentication state is ready.
- */
-async function waitUntilUserIsReady() {
-  const auth = getAuth(firebaseApp);
-  return new Promise((resolve) => {
-    if (auth.currentUser !== null) {
-      resolve(auth.currentUser);
-    } else {
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
-        unsubscribe();
-        resolve(user);
-      });
-    }
-  });
-}
-
 export async function fetchQuestionsByChapter(chapter = 1) {
-  // Wait until auth state is initialized.
-  const user = await waitUntilUserIsReady();
-  let idToken = null;
-  
-  if (user) {
-    try {
-      idToken = await user.getIdToken(false); // forceRefresh=false
-    } catch (err) {
-      console.error("Error retrieving ID token:", err);
-    }
-  }
-
   // Retrieve the entire cache from localStorage and decode it
   let cache = {};
   const cachedEncoded = localStorage.getItem(CACHE_KEY);
@@ -85,7 +55,7 @@ export async function fetchQuestionsByChapter(chapter = 1) {
   const functions = getFunctions(firebaseApp, "us-west1");
   const getQuestionsByChapterCallable = httpsCallable(functions, "getQuestionsByChapter");
   try {
-    const result = await getQuestionsByChapterCallable({ chapter, idToken });
+    const result = await getQuestionsByChapterCallable({ chapter });
     // Update the cache object with the new data
     cache[chapter] = {
       timestamp: Date.now(),
