@@ -33,6 +33,7 @@
             >
               <v-skeleton-loader
                 type="card, article, actions"
+                elevation="11"
               />
             </v-col>
           </template>
