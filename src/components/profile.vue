@@ -1,110 +1,120 @@
 <template>
   <v-container>
     <v-card class="mb-4">
-      <v-card-title>Upgrade to Pro</v-card-title>
-      <v-card-text>
-        <p>Pass your BC Real Estate Licensing Exam on the first try with confidence!</p>
-        <p>Get access today and unlock 800+ high-quality practice questions. Look forward to upcoming flashcards and new questions to keep you one step ahead.</p>
-        <v-row class="mt-4">
-          <v-col cols="12" md="6">
-            <v-hover>
-              <template #default="{ isHovering }">
-                <v-card
-                  outlined
-                  :elevation="isHovering ? 8 : 2"
-                  class="clickable-card"
-                  @click="handleSubscriptionClick('monthly')"
-                >
-                  <v-card-title>Monthly Subscription</v-card-title>
-                  <v-card-text>
-                    <p>$25/month</p>
-                    <p>Unlimited access to all content.</p>
-                  </v-card-text>
-                  <v-card-actions>
-                    <v-btn color="primary" @click.stop="handleSubscriptionClick('monthly')">
-                      {{ isAuthenticated ? "Subscribe" : "Log In to Subscribe" }}
-                    </v-btn>
-                  </v-card-actions>
-                </v-card>
-              </template>
-            </v-hover>
-          </v-col>
-          <v-col cols="12" md="6">
-            <v-hover>
-              <template #default="{ isHovering }">
-                <v-card
-                  outlined
-                  :elevation="isHovering ? 8 : 2"
-                  class="clickable-card"
-                  @click="handleSubscriptionClick('lifetime')"
-                >
-                  <v-card-title>Lifetime Access</v-card-title>
-                  <v-card-text>
-                    <p>$99 one-time payment</p>
-                    <p>Unlimited lifetime access to all content.</p>
-                  </v-card-text>
-                  <v-card-actions>
-                    <v-btn color="primary" @click.stop="handleSubscriptionClick('lifetime')">
-                      {{ isAuthenticated ? "Buy Lifetime" : "Log In to Buy" }}
-                    </v-btn>
-                  </v-card-actions>
-                </v-card>
-              </template>
-            </v-hover>
-          </v-col>
-        </v-row>
-      </v-card-text>
+      <!-- Display Pro Status -->
+      <template v-if="isAuthenticated && subscriptionStatus">
+        <template v-if="subscriptionStatus === 'Lifetime'">
+          <v-card class="mb-4">
+            <v-card-title>Pro Status: Lifetime</v-card-title>
+            <v-card-text>
+              <p>Thank you for your support! You have lifetime access to all content.</p>
+            </v-card-text>
+          </v-card>
+        </template>
+
+        <template v-else-if="subscriptionStatus === 'Monthly'">
+          <v-hover>
+            <template #default="{ isHovering }">
+              <v-card
+                outlined
+                :elevation="isHovering ? 8 : 2"
+                class="clickable-card"
+                @click="manageSubscription"
+              >
+                <v-card-title>Pro Status: Monthly</v-card-title>
+                <v-card-text>
+                  <p>Your subscription is active. You can manage your subscription below.</p>
+                </v-card-text>
+                <v-card-actions>
+                  <v-btn color="primary" @click.stop="manageSubscription">Manage Subscription</v-btn>
+                </v-card-actions>
+              </v-card>
+            </template>
+          </v-hover>
+        </template>
+      </template>
+      <template v-else>
+        <v-card-title>Upgrade to Pro</v-card-title>
+        <v-card-text>
+          <p>Pass your BC Real Estate Licensing Exam on the first try with confidence!</p>
+          <p>Get access today and unlock 800+ high-quality practice questions. Look forward to upcoming flashcards and new questions to keep you one step ahead.</p>
+          <v-row class="mt-4">
+            <v-col cols="12" md="6">
+              <v-hover>
+                <template #default="{ isHovering }">
+                  <v-card
+                    outlined
+                    :elevation="isHovering ? 8 : 2"
+                    class="clickable-card"
+                    @click="handleSubscriptionClick('monthly')"
+                  >
+                    <v-card-title>Monthly Subscription</v-card-title>
+                    <v-card-text>
+                      <p>$25/month</p>
+                      <p>Unlimited access to all content.</p>
+                    </v-card-text>
+                    <v-card-actions>
+                      <v-btn color="primary" @click.stop="handleSubscriptionClick('monthly')">
+                        {{ isAuthenticated ? "Subscribe" : "Log In to Subscribe" }}
+                      </v-btn>
+                    </v-card-actions>
+                  </v-card>
+                </template>
+              </v-hover>
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-hover>
+                <template #default="{ isHovering }">
+                  <v-card
+                    outlined
+                    :elevation="isHovering ? 8 : 2"
+                    class="clickable-card"
+                    @click="handleSubscriptionClick('lifetime')"
+                  >
+                    <v-card-title>Lifetime Access</v-card-title>
+                    <v-card-text>
+                      <p>$99 one-time payment</p>
+                      <p>Unlimited lifetime access to all content.</p>
+                    </v-card-text>
+                    <v-card-actions>
+                      <v-btn color="primary" @click.stop="handleSubscriptionClick('lifetime')">
+                        {{ isAuthenticated ? "Buy Lifetime" : "Log In to Buy" }}
+                      </v-btn>
+                    </v-card-actions>
+                  </v-card>
+                </template>
+              </v-hover>
+            </v-col>
+          </v-row>
+        </v-card-text>
+      </template>
     </v-card>
-
-    <!-- Display Pro Status -->
-    <template v-if="isAuthenticated && subscriptionStatus">
-      <template v-if="subscriptionStatus === 'Lifetime'">
-        <v-card class="mb-4">
-          <v-card-title>Pro Status: Lifetime</v-card-title>
-          <v-card-text>
-            <p>Thank you for your support! You have lifetime access to all content.</p>
-          </v-card-text>
-        </v-card>
-      </template>
-
-      <template v-else-if="subscriptionStatus === 'Monthly'">
-        <v-hover>
-          <template #default="{ isHovering }">
-            <v-card
-              outlined
-              :elevation="isHovering ? 8 : 2"
-              class="clickable-card"
-              @click="manageSubscription"
-            >
-              <v-card-title>Pro Status: Monthly</v-card-title>
-              <v-card-text>
-                <p>Your subscription is active. You can manage your subscription below.</p>
-              </v-card-text>
-              <v-card-actions>
-                <v-btn color="primary" @click.stop="manageSubscription">Manage Subscription</v-btn>
-              </v-card-actions>
-            </v-card>
-          </template>
-        </v-hover>
-      </template>
-    </template>
   </v-container>
 
   <LoginModal ref="loginModal" />
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { useAuth } from "../composables/useAuth";
 import useMembership from "../composables/useMembership";
 import LoginModal from "./loginModal.vue";
+import { useRoute } from "vue-router";
 
-const { isAuthenticated, isPro, proStatus } = useAuth();
-const { startCheckout } = useMembership();
+const { isAuthenticated, isPro, proStatus, user, authInitialized } = useAuth(); // Get user, no need for authInitialized here anymore unless needed elsewhere
+const { startCheckout, verifyPayment } = useMembership(); // Use verifyPayment from useMembership
+const route = useRoute();
 
 const subscriptionStatus = ref(null); // Tracks the user's subscription status
 const loginModal = ref(null);
-const subscriptionModal = ref(null);
+
+// --- Key Change: Watch proStatus directly ---
+watch(proStatus, (newStatus) => {
+  console.log("WATCH proStatus updated:", newStatus);
+  subscriptionStatus.value = newStatus; // Keep local state synced with the authoritative source
+}, { immediate: true }); // immediate: true runs the watcher once on setup with the initial value
+// ------------------------------------------
+
 
 // Open the login modal
 function openLoginModal() {
@@ -132,10 +142,52 @@ function manageSubscription() {
   // Implement logic to redirect to Stripe's customer portal
 }
 
-// Watch for changes in `isPro` to update subscription status
-if (isPro) {
-  subscriptionStatus.value = isPro;
+// Handle payment success
+async function handlePaymentSuccess() {
+  const sessionId = route.query.sessionId; // Extract sessionId from the query parameter
+
+  if (!sessionId) {
+    console.error("No sessionId found in the URL.");
+    return;
+  }
+
+  // Wait for the authentication state to initialize
+  if (!isAuthenticated.value) {
+    console.error("User is not authenticated. Waiting for authentication...");
+    const stopWatch = watch(
+      () => isAuthenticated.value,
+      (newVal) => {
+        if (newVal) {
+          console.log("User is now authenticated. Proceeding with payment verification...");
+          stopWatch(); // Stop watching once authenticated
+          handlePaymentSuccess(); // Retry the function
+        }
+      }
+    );
+    return;
+  }
+
+  try {
+    const result = await verifyPayment(sessionId); // Use verifyPayment from useMembership
+
+    if (result.success) {
+      console.log("Payment verified successfully. Subscription type:", result.subscriptionType);
+      subscriptionStatus.value = result.subscriptionType; // Update the local state
+    } else {
+      console.error("Payment verification failed.");
+    }
+  } catch (error) {
+    console.error("Error verifying payment status:", error);
+  }
 }
+
+// Check if the success query parameter is present
+onMounted(() => {
+  if (route.query.success === "true") {
+    console.log("Success query parameter detected. Calling handlePaymentSuccess...");
+    handlePaymentSuccess();
+  }
+});
 </script>
 
 <style scoped>

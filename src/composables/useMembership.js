@@ -11,29 +11,6 @@ export default function useMembership() {
   const membershipStatus = ref("");
   const expirationDate = ref("");
 
-  // Fetch membership status from Firebase Functions
-  async function fetchMembershipStatus() {
-    if (!user.value) {
-      console.error("User is not authenticated");
-      throw new Error("User is not authenticated");
-    }
-
-    try {
-      const idToken = await user.value.getIdToken(true); // Force refresh to get updated claims
-      const getMembershipStatusCallable = httpsCallable(functions, "getMembershipStatus");
-
-      const result = await getMembershipStatusCallable({ idToken });
-      isPro.value = result.data.member || false;
-      membershipStatus.value = result.data.status || "inactive";
-      expirationDate.value = result.data.expirationDate || null;
-
-      console.log("Membership status fetched:", result.data);
-    } catch (error) {
-      console.error("Error fetching membership status:", error);
-      throw new Error("Failed to fetch membership status");
-    }
-  }
-
   // Start a Stripe Checkout session
   async function startCheckout(priceId) {
     if (!user.value) {
@@ -47,15 +24,15 @@ export default function useMembership() {
 
       console.log("Payload sent to createCheckoutSession:", {
         priceId,
-        successUrl: `${window.location.origin}/profile?success=true`,
-        cancelUrl: `${window.location.origin}/profile?canceled=true`,
+        successUrl: `${window.location.origin}/pro?success=true`,
+        cancelUrl: `${window.location.origin}/pro?canceled=true`,
         idToken,
       });
 
       const result = await createCheckoutSessionCallable({
         priceId,
-        successUrl: `${window.location.origin}/profile?success=true`,
-        cancelUrl: `${window.location.origin}/profile?canceled=true`,
+        successUrl: `${window.location.origin}/pro?success=true`,
+        cancelUrl: `${window.location.origin}/pro?canceled=true`,
         idToken, // Pass the ID token for authentication
       });
 
@@ -65,6 +42,29 @@ export default function useMembership() {
     } catch (error) {
       console.error("Error starting checkout:", error);
       throw new Error("Failed to start checkout session");
+    }
+  }
+
+  // Verify payment status
+  async function verifyPayment(sessionId) {
+    if (!user.value) {
+      console.error("User is not authenticated");
+      throw new Error("User is not authenticated");
+    }
+
+    try {
+      const idToken = await user.value.getIdToken(true); // Force refresh to ensure valid token
+      console.log("ID token retrieved:", idToken);
+
+      const verifyPaymentStatusCallable = httpsCallable(functions, "verifyPaymentStatus");
+
+      const result = await verifyPaymentStatusCallable({ sessionId, idToken }); // Pass the idToken
+      console.log("Payment verification result:", result.data);
+
+      return result.data; // Return the result from the backend
+    } catch (error) {
+      console.error("Error verifying payment status:", error);
+      throw new Error("Failed to verify payment status");
     }
   }
 
@@ -92,8 +92,8 @@ export default function useMembership() {
     isPro,
     membershipStatus,
     expirationDate,
-    fetchMembershipStatus,
     startCheckout,
+    verifyPayment, // Expose verifyPayment
     manageSubscription,
   };
 }

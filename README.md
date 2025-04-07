@@ -31,5 +31,10 @@ npm run lint:fix - in functions folder
 firebase deploy --only hosting
 ```
 
+### stripe testing
+```
+https://docs.stripe.com/testing
+```
+
 ### Customize configuration
 See [Configuration Reference](https://cli.vuejs.org/config/).

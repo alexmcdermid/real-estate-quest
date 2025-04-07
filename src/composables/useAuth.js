@@ -34,18 +34,6 @@ export function useAuth() {
         proStatus.value = currentProStatus; // Store the string status
         isPro.value = currentProStatus === 'Monthly' || currentProStatus === 'Lifetime';
 
-        console.log("Custom claims processed:", idTokenResult.claims);
-        console.log("User pro status:", proStatus.value, "isPro:", isPro.value);
-
-        console.log("User pro status:", proStatus);
-        if (proStatus === "Monthly") {
-          console.log("User has a Monthly subscription");
-        } else if (proStatus === "Lifetime") {
-          console.log("User has a Lifetime subscription");
-        } else {
-          console.log("User is not a Pro member");
-        }
-
       } catch (error) {
         console.error("Error getting ID token result/claims:", error);
         isPro.value = false;
@@ -122,5 +110,7 @@ export function useAuth() {
     logout,
     sendLoginEmailLink,
     completeEmailLinkLogin,
+    isPro,
+    proStatus,
   };
 }
