@@ -103,6 +103,7 @@ import { useAuth } from "../composables/useAuth";
 import useMembership from "../composables/useMembership";
 import LoginModal from "./loginModal.vue";
 import { useRoute } from "vue-router";
+import { clearCache } from "@/composables/useQuestion";
 
 const { isAuthenticated, isPro, proStatus, user, authInitialized } = useAuth();
 const { startCheckout, verifyPayment } = useMembership();
@@ -168,6 +169,7 @@ async function handlePaymentSuccess() {
     if (result.success) {
       console.log("Payment verified successfully. Subscription type:", result.subscriptionType);
       subscriptionStatus.value = result.subscriptionType;
+      clearCache();
     } else {
       console.error("Payment verification failed.");
     }

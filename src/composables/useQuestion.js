@@ -33,8 +33,6 @@ export function clearCache() {
 
   const preservedOptions = cache.options || {};
   localStorage.setItem(CACHE_KEY, encodeCache({ options: preservedOptions }));
-
-  window.location.reload();
 }
 
 export async function fetchQuestionsByChapter(chapter = 1) {

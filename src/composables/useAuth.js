@@ -64,6 +64,7 @@ export function useAuth() {
     try {
       await signOut(auth);
       clearCache();
+      window.location.reload();
     } catch (error) {
       console.error("Error during logout:", error);
     }
@@ -96,6 +97,7 @@ export function useAuth() {
         await signInWithEmailLink(auth, email, window.location.href);
         window.localStorage.removeItem("emailForSignIn");
         clearCache();
+        window.location.reload();
       } catch (error) {
         console.error("Error completing email link login:", error);
       }

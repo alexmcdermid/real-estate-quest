@@ -51,8 +51,10 @@ const email = ref("");
 const showEmailInput = ref(false);
 const emailError = ref(false);
 const emailSent = ref(false);
+const isLoggingIn = ref(false);
+const emailSending = ref(false);
 
-const { googlyLogin, sendLoginEmailLink, completeEmailLinkLogin } = useAuth();
+const { googlyLogin, sendLoginEmailLink, completeEmailLinkLogin, isAuthenticated } = useAuth();
 
 // Expose an open method so the parent (navbar) can trigger the modal.
 function open() {
@@ -64,8 +66,17 @@ function close() {
   dialog.value = false;
 }
 
-function handleGooglyLogin() {
-  googlyLogin();
+async function handleGooglyLogin() {
+  isLoggingIn.value = true; // Start loading
+  try {
+    await googlyLogin();
+    console.log("Google login successful via modal action, closing modal.");
+    window.location.reload();
+  } catch (error) {
+    console.error("Google Login failed:", error);
+  } finally {
+    isLoggingIn.value = false;
+  }
 }
 
 // Toggle the email input display.
@@ -82,12 +93,21 @@ function validateEmail() {
   emailError.value = !isValidEmail.value;
 }
 
-function handleEmailLinkLogin() {
-  if (isValidEmail.value) {
-    sendLoginEmailLink(email.value);
-    emailSent.value = true;
+async function handleEmailLinkLogin() {
+  validateEmail();
+  if (isValidEmail.value && !emailError.value) {
+    emailSending.value = true;
+    try {
+      await sendLoginEmailLink(email.value);
+      emailSent.value = true;
+    } catch (error) {
+      console.error("Failed to send email link:", error);
+    } finally {
+      emailSending.value = false;
+    }
   } else {
-    console.error("Invalid email format");
+    console.error("Attempted to send link with invalid email.");
+    emailError.value = true;
   }
 }
 
