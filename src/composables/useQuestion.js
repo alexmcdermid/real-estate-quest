@@ -1,6 +1,5 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp } from "../config/firebaseConfig";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { CACHE_KEY, STALE_TIME } from "../config/constants"
  
 /**

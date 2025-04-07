@@ -22,19 +22,19 @@ let stripe;
  * @param {number} [indent=2] - The number of spaces to use for indentation.
  * @return {string} The JSON string representation of the object.
  */
-function safeStringify(obj, indent = 2) {
-  const cache = new Set();
-  return JSON.stringify(obj, (key, value) => {
-    if (typeof value === "object" && value !== null) {
-      if (cache.has(value)) {
-        // Duplicate reference found, discard key
-        return;
-      }
-      cache.add(value);
-    }
-    return value;
-  }, indent);
-}
+// function safeStringify(obj, indent = 2) {
+//   const cache = new Set();
+//   return JSON.stringify(obj, (key, value) => {
+//     if (typeof value === "object" && value !== null) {
+//       if (cache.has(value)) {
+//         // Duplicate reference found, discard key
+//         return;
+//       }
+//       cache.add(value);
+//     }
+//     return value;
+//   }, indent);
+// }
 
 export const getQuestionsByChapter = onCall(
     {
@@ -45,9 +45,6 @@ export const getQuestionsByChapter = onCall(
     async (request) => {
       let isPremium = false;
       const authContext = request.auth;
-
-      console.log("getQuestionsByChapter: Auth context received:", safeStringify(authContext));
-      console.log("getQuestionsByChapter: Data received:", safeStringify(request.data));
 
       if (authContext && authContext.uid) {
         const proStatus = authContext.token?.proStatus;
@@ -188,32 +185,18 @@ export const createCheckoutSession = onCall(
       enforceAppCheck: true,
       secrets: [stripeSecretKey],
     },
-    async (data, context) => {
-      let userId = null;
+    async (request) => {
+      let userId;
+      const authContext = request.auth;
 
-      console.log("Received context:", safeStringify(context));
-      console.log("Received data:", safeStringify(data));
-
-      // If context.auth is not set, try manually verifying idToken passed in data.data
-      if (!context.auth && data.data && data.data.idToken) {
-        try {
-          const decodedToken = await admin.auth().verifyIdToken(data.data.idToken);
-          context.auth = decodedToken;
-          console.log("Manually verified token, updated context.auth:", safeStringify(context.auth));
-        } catch (error) {
-          console.error("Error verifying manual token:", error);
-          throw new Error("Authentication required");
-        }
-      }
-
-      if (context.auth && context.auth.uid) {
-        userId = context.auth.uid;
+      if (authContext && authContext.uid) {
+        userId = authContext.uid;
       } else {
         console.log("No authenticated user detected.");
         throw new Error("Authentication required");
       }
 
-      const {priceId, successUrl, cancelUrl} = data.data;
+      const {priceId, successUrl, cancelUrl} = request.data;
 
       // Initialize Stripe with the secret key
       stripe = stripe || new Stripe(stripeSecretKey.value());
@@ -227,10 +210,10 @@ export const createCheckoutSession = onCall(
             quantity: 1,
           },
         ],
-        success_url: `${successUrl}&sessionId={CHECKOUT_SESSION_ID}`, // Add sessionId placeholder
+        success_url: `${successUrl}&sessionId={CHECKOUT_SESSION_ID}`,
         cancel_url: cancelUrl,
         metadata: {
-          userId, // Store the user's UID for later reference
+          userId,
         },
       });
 
@@ -244,10 +227,10 @@ export const createCheckoutSession = onCall(
               quantity: 1,
             },
           ],
-          success_url: `${successUrl}&sessionId={CHECKOUT_SESSION_ID}`, // Add sessionId placeholder
+          success_url: `${successUrl}&sessionId={CHECKOUT_SESSION_ID}`,
           cancel_url: cancelUrl,
           metadata: {
-            userId, // Store the user's UID for later reference
+            userId,
           },
         });
 
@@ -371,25 +354,18 @@ export const verifyPaymentStatus = onCall(
       enforceAppCheck: true,
       secrets: [stripeSecretKey],
     },
-    async (data, context) => {
-      const {sessionId, idToken} = data.data;
+    async (request) => {
+      let userId;
+      const authContext = request.auth;
 
-      if (!idToken) {
-        console.error("Missing ID token in request.");
+      if (authContext && authContext.uid) {
+        userId = authContext.uid;
+      } else {
+        console.log("No authenticated user detected.");
         throw new Error("Authentication required");
       }
 
-      let userId;
-
-      // Manually verify the ID token
-      try {
-        const decodedToken = await admin.auth().verifyIdToken(idToken);
-        userId = decodedToken.uid;
-        console.log("Manually verified token, userId:", userId);
-      } catch (error) {
-        console.error("Error verifying ID token:", error);
-        throw new Error("Invalid authentication token");
-      }
+      const {sessionId} = request.data;
 
       // Initialize Stripe with the secret key
       stripe = stripe || new Stripe(stripeSecretKey.value());

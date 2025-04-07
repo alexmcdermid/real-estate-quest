@@ -19,21 +19,18 @@ export default function useMembership() {
     }
 
     try {
-      const idToken = await user.value.getIdToken(true); // Force refresh to ensure valid token
       const createCheckoutSessionCallable = httpsCallable(functions, "createCheckoutSession");
 
       console.log("Payload sent to createCheckoutSession:", {
         priceId,
         successUrl: `${window.location.origin}/pro?success=true`,
         cancelUrl: `${window.location.origin}/pro?canceled=true`,
-        idToken,
       });
 
       const result = await createCheckoutSessionCallable({
         priceId,
         successUrl: `${window.location.origin}/pro?success=true`,
         cancelUrl: `${window.location.origin}/pro?canceled=true`,
-        idToken, // Pass the ID token for authentication
       });
 
       console.log("Redirecting to Stripe Checkout...");
@@ -53,12 +50,9 @@ export default function useMembership() {
     }
 
     try {
-      const idToken = await user.value.getIdToken(true); // Force refresh to ensure valid token
-      console.log("ID token retrieved:", idToken);
-
       const verifyPaymentStatusCallable = httpsCallable(functions, "verifyPaymentStatus");
 
-      const result = await verifyPaymentStatusCallable({ sessionId, idToken }); // Pass the idToken
+      const result = await verifyPaymentStatusCallable({ sessionId });
       console.log("Payment verification result:", result.data);
 
       return result.data; // Return the result from the backend
@@ -76,10 +70,9 @@ export default function useMembership() {
     }
 
     try {
-      const idToken = await user.value.getIdToken(true); // Force refresh to ensure valid token
       const manageSubscriptionCallable = httpsCallable(functions, "manageSubscription");
 
-      const result = await manageSubscriptionCallable({ idToken });
+      const result = await manageSubscriptionCallable({});
       console.log("Redirecting to Stripe customer portal...");
       window.location.href = result.data.url; // Redirect to the Stripe customer portal
     } catch (error) {
