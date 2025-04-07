@@ -129,9 +129,9 @@ function handleSubscriptionClick(type) {
     openLoginModal();
   } else {
     if (type === "monthly") {
-      startCheckout("price_1RAZfIDHHGtkTOPhKGMMIQGn"); // Replace with your actual Stripe price ID for monthly
+      startCheckout("price_1RAZfIDHHGtkTOPhKGMMIQGn");
     } else if (type === "lifetime") {
-      startCheckout("price_1RAZgSDHHGtkTOPhyhqr29ai"); // Replace with your actual Stripe price ID for lifetime
+      startCheckout("price_1RAZgSDHHGtkTOPhyhqr29ai");
     }
   }
 }
