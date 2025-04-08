@@ -44,7 +44,8 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
-import { useAuth } from "../composables/useAuth";
+import { useAuthStore } from '@/composables/useAuth';
+const authStore = useAuthStore();
 
 const dialog = ref(false);
 const email = ref("");
@@ -53,8 +54,6 @@ const emailError = ref(false);
 const emailSent = ref(false);
 const isLoggingIn = ref(false);
 const emailSending = ref(false);
-
-const { googlyLogin, sendLoginEmailLink, completeEmailLinkLogin, isAuthenticated } = useAuth();
 
 // Expose an open method so the parent (navbar) can trigger the modal.
 function open() {
@@ -69,7 +68,7 @@ function close() {
 async function handleGooglyLogin() {
   isLoggingIn.value = true; // Start loading
   try {
-    await googlyLogin();
+    await authStore.googlyLogin();
     console.log("Google login successful via modal action, closing modal.");
     window.location.reload();
   } catch (error) {
@@ -98,7 +97,7 @@ async function handleEmailLinkLogin() {
   if (isValidEmail.value && !emailError.value) {
     emailSending.value = true;
     try {
-      await sendLoginEmailLink(email.value);
+      await authStore.sendLoginEmailLink(email.value);
       emailSent.value = true;
     } catch (error) {
       console.error("Failed to send email link:", error);
@@ -113,6 +112,6 @@ async function handleEmailLinkLogin() {
 
 // On mount, attempt to complete email link login if the URL is valid.
 onMounted(() => {
-  completeEmailLinkLogin();
+  authStore.completeEmailLinkLogin();
 });
 </script>

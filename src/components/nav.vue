@@ -50,16 +50,20 @@
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router';
+import { useRouter } from "vue-router";
 import { ref, computed } from "vue";
+import { useAuthStore } from "@/composables/useAuth";
+import { storeToRefs } from "pinia";
 import useDark from "../composables/useDark";
-import { useAuth } from "../composables/useAuth";
+
 import LoginModal from "./loginModal.vue";
 import OptionModal from "./optionModal.vue";
 import defaultAvatar from "@/assets/default-avatar.png";
 
+const authStore = useAuthStore();
+const { isAuthenticated, user } = storeToRefs(authStore);
+
 const { isDark, darkModeIcon, toggleDarkMode } = useDark();
-const { isAuthenticated, user, logout } = useAuth();
 const userPhotoURL = computed(() => user.value?.photoURL || defaultAvatar);
 const loginModal = ref(null);
 const optionModal = ref(null);
@@ -74,6 +78,10 @@ function openOptionModal() {
   if (optionModal.value && optionModal.value.open) {
     optionModal.value.open();
   }
+}
+
+function logout() {
+  authStore.logout(); // Call the logout action from the Pinia store
 }
 
 const router = useRouter();

@@ -60,24 +60,27 @@
 
 <script setup>
 import { ref, watch, onMounted, computed } from "vue";
-import { useAuth } from "../composables/useAuth";
+import { useAuthStore } from "../composables/useAuth";
+import { storeToRefs } from "pinia";
+
 import { fetchQuestionsByChapter } from "../composables/useQuestion";
 import QuestionCard from "./questionCard.vue";
 import ProCard from "./proCard.vue";
 import useOptions from "../composables/useOption";
 import { chapters } from "@/constants/chapters";
 
-const { authInitialized } = useAuth();
+const authStore = useAuthStore();
+const { authInitialized } = storeToRefs(authStore);
+
 const { options } = useOptions();
 
 const isLoading = ref(true);
 const selectedChapter = ref(1);
 const questions = ref([]);
-const completedQuestions = ref(new Set()); // Track completed questions
+const completedQuestions = ref(new Set());
 const shuffled = computed(() => options.shuffled);
-const resetAll = ref(false); // Reactive property to trigger reset
+const resetAll = ref(false);
 
-// Dynamically add ProCard in the middle if questions are fewer than 10
 const questionsWithProCard = computed(() => {
   const questionItems = questions.value.map((q, index) => ({
     component: QuestionCard,
@@ -90,7 +93,7 @@ const questionsWithProCard = computed(() => {
   }));
 
   if (questions.value.length < 10) {
-    const middleIndex = Math.floor(questionItems.length / 2); // Insert in the middle
+    const middleIndex = Math.floor(questionItems.length / 2);
     questionItems.splice(middleIndex, 0, {
       component: ProCard,
       props: {},
@@ -100,24 +103,20 @@ const questionsWithProCard = computed(() => {
   return questionItems;
 });
 
-// Check if at least one question is completed
 const hasCompletedQuestions = computed(() => completedQuestions.value.size > 0);
 
-// Mark a question as completed
 function markQuestionCompleted(index) {
   completedQuestions.value.add(index);
 }
 
-// Mark a question as reset
 function markQuestionReset(index) {
   completedQuestions.value.delete(index);
 }
 
-// Reset all questions
 function resetAllQuestions() {
-  resetAll.value = true; // Trigger reset in all child components
+  resetAll.value = true;
   setTimeout(() => {
-    resetAll.value = false; // Reset the flag after the reset is complete
+    resetAll.value = false;
   }, 0);
 }
 

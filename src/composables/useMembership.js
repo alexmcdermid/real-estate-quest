@@ -1,10 +1,14 @@
 import { ref } from "vue";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp } from "../config/firebaseConfig";
-import { useAuth } from "./useAuth";
+import { storeToRefs } from "pinia";
+import { useAuthStore } from '../composables/useAuth';
+import { clearCache } from "../composables/useQuestion";
 
 export default function useMembership() {
-  const { user } = useAuth(); // Use user from useAuth
+  const authStore = useAuthStore();
+  const { user } = storeToRefs(authStore); // Use storeToRefs for reactivity
+
   const functions = getFunctions(firebaseApp, "us-west1");
 
   const isPro = ref(false);
@@ -13,6 +17,7 @@ export default function useMembership() {
 
   // Start a Stripe Checkout session
   async function startCheckout(priceId) {
+    console.log("authStore.user:", user.value); // Debug log
     if (!user.value) {
       console.error("User is not authenticated");
       throw new Error("User is not authenticated");
@@ -54,6 +59,13 @@ export default function useMembership() {
 
       const result = await verifyPaymentStatusCallable({ sessionId });
       console.log("Payment verification result:", result.data);
+
+      if (result.data?.success === true) {
+        // Force refresh of the ID token to update custom claims
+        console.log("ID token refreshed to update custom claims.");
+        clearCache();
+        await authStore.forceClaimRefresh();
+      }
 
       return result.data; // Return the result from the backend
     } catch (error) {
