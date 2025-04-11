@@ -372,7 +372,7 @@ export const handleStripeWebhook = onRequest(
 
               if (userData?.subscriptionId) {
                 try {
-                  await stripe.subscriptions.del(userData.subscriptionId);
+                  await stripe.subscriptions.cancel(userData.subscriptionId);
                   console.log(`Cancelled existing subscription for user: ${userId}`);
                 } catch (cancelErr) {
                   console.warn(`Failed to cancel sub ${userData.subscriptionId} for user ${userId}:`, cancelErr);
