@@ -254,13 +254,13 @@ export const createCheckoutSession = onCall(
           if (type === "lifetime") {
             priceId = "price_1RCnE0D0qfc5FtYvebtSnn2E"; // prod lifetime
           } else {
-            priceId = "price_1RCnEeD0qfc5FtYvXYJGJ9Yp"; // prod monthly
+            priceId = "price_1RCq08D0qfc5FtYvyVaSkEO2"; // prod monthly
           }
         } else {
           if (type === "lifetime") {
             priceId = "price_1RAZgSDHHGtkTOPhyhqr29ai"; // dev lifetime
           } else {
-            priceId = "price_1RAZfIDHHGtkTOPhKGMMIQGn"; // dev monthly
+            priceId = "price_1RCq0dDHHGtkTOPht9gQjVxa"; // dev monthly
           }
         }
 
