@@ -24,4 +24,5 @@ pnpm-debug.log*
 *.sln
 *.sw?
 
+.firebase-debug.log
 functions/firebase-debug.log
