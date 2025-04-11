@@ -79,7 +79,7 @@
                     >
                       <v-card-title>Monthly Subscription</v-card-title>
                       <v-card-text>
-                        <p>$25/month</p>
+                        <p>$33/month</p>
                         <p>Unlimited access to all content.</p>
                       </v-card-text>
                       <v-card-actions>

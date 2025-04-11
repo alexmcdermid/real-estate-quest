@@ -21,7 +21,7 @@
         <ul class="ml-6 mb-4">
           <li><strong>Billing:</strong>
             <ul>
-               <li class="mt-2"><strong>Monthly Subscription:</strong> If you choose the monthly subscription option, you will be billed $25.00 CAD per month (plus applicable taxes) in advance on a recurring basis. Your subscription begins upon successful payment and automatically renews each month unless cancelled.</li>
+               <li class="mt-2"><strong>Monthly Subscription:</strong> If you choose the monthly subscription option, you will be billed $33.00 CAD per month (plus applicable taxes) in advance on a recurring basis. Your subscription begins upon successful payment and automatically renews each month unless cancelled.</li>
                <li class="mt-2"><strong>One-Time Purchase:</strong> If you choose the one-time purchase option, you will be charged a single fee of $99.00 CAD (plus applicable taxes). This purchase grants you indefinite access to the features designated as Paid Services at the time of purchase, for as long as the Service is operated, subject to your compliance with these Terms of Service (including Section 10 regarding Termination).</li>
              </ul>
           </li>
