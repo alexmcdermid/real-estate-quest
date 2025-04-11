@@ -179,6 +179,44 @@ export const importQuestionsFromRepo = onSchedule(
     },
 );
 
+export const expireCanceledMemberships = onSchedule(
+    {
+      schedule: "0 0 * * *",
+      timeZone: "America/Los_Angeles",
+      region: "us-west1",
+    },
+    async () => {
+      const now = admin.firestore.Timestamp.now();
+
+      const snapshot = await db.collection("members")
+          .where("cancelAt", "<=", now)
+          .get();
+
+      if (snapshot.empty) {
+        console.log("No memberships to expire.");
+        return;
+      }
+
+      const batch = db.batch();
+
+      for (const doc of snapshot.docs) {
+        const userId = doc.id;
+
+        batch.set(doc.ref, {
+          member: false,
+          subscriptionType: null,
+          status: "inactive",
+          cancelAt: admin.firestore.FieldValue.delete(),
+        }, {merge: true});
+
+        await admin.auth().setCustomUserClaims(userId, {member: false, proStatus: null});
+        console.log(`Expired membership for user: ${userId}`);
+      }
+
+      await batch.commit();
+    },
+);
+
 export const createCheckoutSession = onCall(
     {
       region: "us-west1",
@@ -186,41 +224,42 @@ export const createCheckoutSession = onCall(
       secrets: [stripeSecretKey],
     },
     async (request) => {
-      let userId;
       const authContext = request.auth;
 
-      if (authContext && authContext.uid) {
-        userId = authContext.uid;
-      } else {
-        console.log("No authenticated user detected.");
+      if (!authContext || !authContext.uid) {
+        console.error("No authenticated user detected.");
         throw new Error("Authentication required");
       }
 
+      const userId = authContext.uid;
       const {priceId, successUrl, cancelUrl} = request.data;
 
       // Initialize Stripe with the secret key
       stripe = stripe || new Stripe(stripeSecretKey.value());
 
-      console.log("Creating Stripe Checkout session with:", {
-        payment_method_types: ["card"],
-        mode: "subscription",
-        line_items: [
-          {
-            price: priceId,
-            quantity: 1,
-          },
-        ],
-        success_url: `${successUrl}&sessionId={CHECKOUT_SESSION_ID}`,
-        cancel_url: cancelUrl,
-        metadata: {
-          userId,
-        },
-      });
-
       try {
+      // Determine the mode based on the priceId
+        const mode = priceId === "price_1RAZgSDHHGtkTOPhyhqr29ai" ? "payment" : "subscription";
+
+        console.log("Creating Stripe Checkout session with:", {
+          payment_method_types: ["card"],
+          mode,
+          line_items: [
+            {
+              price: priceId,
+              quantity: 1,
+            },
+          ],
+          success_url: `${successUrl}&sessionId={CHECKOUT_SESSION_ID}`,
+          cancel_url: cancelUrl,
+          metadata: {
+            userId,
+          },
+        });
+
         const session = await stripe.checkout.sessions.create({
           payment_method_types: ["card"],
-          mode: "subscription",
+          mode,
           line_items: [
             {
               price: priceId,
@@ -296,6 +335,7 @@ export const handleStripeWebhook = onRequest(
                 {
                   member: true,
                   subscriptionId: session.subscription,
+                  customerId: session.customer,
                   status: "active",
                   subscriptionType,
                 },
@@ -311,40 +351,120 @@ export const handleStripeWebhook = onRequest(
 
           break;
         }
-        case "customer.subscription.deleted":
-          case "invoice.payment_failed": {
-            const subscription = event.data.object;
-            const userId = subscription.metadata.userId;
-  
-            if (!userId) {
-              console.error("Missing userId in subscription metadata.");
-              return res.status(400).send("Invalid subscription metadata.");
-            }
-  
-            try {
+        case "customer.subscription.updated": {
+          const subscription = event.data.object;
+          const customerId = subscription.customer;
+          const cancelAt = subscription.cancel_at_period_end ? subscription.cancel_at : null;
+
+          const memberSnap = await db.collection("members")
+              .where("customerId", "==", customerId)
+              .limit(1)
+              .get();
+
+          if (memberSnap.empty) {
+            console.warn(`No user found in Firestore for customerId: ${customerId}`);
+            break;
+          }
+
+          const userId = memberSnap.docs[0].id;
+
+          try {
+            if (cancelAt) {
+              // user scheduled a cancellation
+              const cancelDate = new Date(cancelAt * 1000);
+              console.log(`User ${userId} scheduled cancel at: ${cancelDate.toISOString()}`);
+
               await db.collection("members").doc(userId).set(
                   {
-                    member: false,
-                    status: "inactive",
-                    subscriptionType: null,
+                    cancelAt: admin.firestore.Timestamp.fromDate(cancelDate),
                   },
                   {merge: true},
               );
-  
-              await admin.auth().setCustomUserClaims(userId, {member: false, proStatus: null});
-              console.log(`Subscription marked inactive for user: ${userId}`);
-            } catch (error) {
-              console.error("Error handling subscription deletion or payment failure:", error);
-              return res.status(500).send("Internal Server Error");
+
+              const user = await admin.auth().getUser(userId);
+              const existingClaims = user.customClaims || {};
+
+              await admin.auth().setCustomUserClaims(userId, {
+                ...existingClaims,
+                member: true,
+                proStatus: "Monthly",
+                expires: cancelAt,
+              });
+            } else {
+              // user resumed subscription — remove scheduled cancel
+              console.log(`User ${userId} resumed subscription. Clearing cancelAt.`);
+
+              await db.collection("members").doc(userId).set(
+                  {
+                    cancelAt: admin.firestore.FieldValue.delete(),
+                  },
+                  {merge: true},
+              );
+
+              const user = await admin.auth().getUser(userId);
+              const existingClaims = user.customClaims || {};
+              delete existingClaims.expires;
+
+              await admin.auth().setCustomUserClaims(userId, {
+                ...existingClaims,
+                member: true,
+                proStatus: "Monthly",
+              });
             }
-  
-            break;
+          } catch (error) {
+            console.error("Failed to update subscription state:", error);
+            return res.status(500).send("Internal Server Error");
           }
+
+          break;
+        }
 
         default:
           console.log(`Unhandled event type: ${event.type}`);
       }
 
       res.status(200).send("Webhook received");
+    },
+);
+
+export const manageSubscription = onCall(
+    {
+      region: "us-west1",
+      enforceAppCheck: true,
+      secrets: [stripeSecretKey],
+    },
+    async (request) => {
+      const authContext = request.auth;
+
+      if (!authContext || !authContext.uid) {
+        console.error("No authenticated user detected.");
+        throw new Error("Authentication required");
+      }
+
+      stripe = stripe || new Stripe(stripeSecretKey.value());
+
+      const userId = authContext.uid;
+
+      try {
+      // Fetch the customer ID from Firestore
+        const userDoc = await db.collection("members").doc(userId).get();
+        if (!userDoc.exists || !userDoc.data().customerId) {
+          console.error(`No customer ID found for user: ${userId}`);
+          throw new Error("Customer not found");
+        }
+
+        const customerId = userDoc.data().customerId;
+
+        // Create a billing portal session
+        const session = await stripe.billingPortal.sessions.create({
+          customer: customerId,
+          return_url: request.data.returnUrl,
+        });
+
+        return {url: session.url};
+      } catch (error) {
+        console.error("Error creating billing portal session:", error);
+        throw new Error("Failed to create billing portal session");
+      }
     },
 );

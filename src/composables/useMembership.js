@@ -1,4 +1,3 @@
-import { ref } from "vue";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp } from "../config/firebaseConfig";
 import { storeToRefs } from "pinia";

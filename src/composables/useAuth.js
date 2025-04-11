@@ -20,6 +20,7 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref(null);
   const proStatus = ref(null); // Raw status from claims
   const authInitialized = ref(false); // Tracks initial listener run
+  const proExpires = ref(null);
 
   // --- Getters (Computed State) ---
   const isAuthenticated = computed(() => !!user.value); // Derive from user state
@@ -42,9 +43,12 @@ export const useAuthStore = defineStore('auth', () => {
       // Force refresh the ID token to get updated custom claims
       const idTokenResult = await currentUser.getIdTokenResult(true); // Force token refresh
       const currentProStatus = idTokenResult.claims.proStatus || null;
+      const currentExpiry = idTokenResult.claims.expires || null;
 
       proStatus.value = currentProStatus; // Update proStatus
       console.log(`Claims updated. proStatus: ${proStatus.value}`);
+      proExpires.value = currentExpiry; // Update proExpires
+      console.log(`Claims updated. proExpires: ${proExpires.value}`);
     } catch (error) {
       console.error("Error getting ID token result/claims:", error);
       proStatus.value = null;
@@ -113,7 +117,7 @@ export const useAuthStore = defineStore('auth', () => {
         console.log("Pinia onAuthStateChanged triggered. User:", currentUser ? currentUser.uid : 'null');
         await fetchClaimsAndSetState(currentUser); // Fetch claims and update state refs
         authInitialized.value = true; // Mark as initialized AFTER processing
-        console.log("Pinia Auth state updated. Initialized:", authInitialized.value, "Authenticated:", isAuthenticated.value, "isPro:", isPro.value, "Status:", proStatus.value);
+        console.log("Pinia Auth state updated. Initialized:", authInitialized.value, "Authenticated:", isAuthenticated.value, "isPro:", isPro.value, "Status:", proStatus.value, "Expires:", proExpires.value);
       });
   }
 
@@ -129,6 +133,7 @@ export const useAuthStore = defineStore('auth', () => {
     user,
     proStatus,
     authInitialized,
+    proExpires,
 
     // Getters (Computed)
     isAuthenticated,

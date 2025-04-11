@@ -23,7 +23,8 @@
                 >
                   <v-card-title>Pro Status: Monthly</v-card-title>
                   <v-card-text>
-                    <p>Your subscription is active. You can manage your subscription below.</p>
+                    <p v-if="proExpires">Your subscription expires: {{ formatDate(proExpires) }}. You can manage your subscription below.</p>
+                    <p v-else>Your subscription is active. You can manage your subscription below.</p>
                   </v-card-text>
                   <v-card-actions>
                     <v-btn color="primary" @click.stop="manageSubscription">
@@ -116,7 +117,7 @@ import LoginModal from "./loginModal.vue";
 import { useRoute, useRouter } from "vue-router";
 
 const authStore = useAuthStore();
-const { authInitialized, isAuthenticated, proStatus } = storeToRefs(authStore);
+const { authInitialized, isAuthenticated, proStatus, proExpires } = storeToRefs(authStore);
 
 const { startCheckout, manageSubscription } = useMembership();
 const route = useRoute();
@@ -141,6 +142,18 @@ function handleSubscriptionClick(type) {
     }
   }
 }
+
+const formatDate = (timestamp) => {
+  if (!timestamp || timestamp === null) return "";
+  const date = typeof timestamp === "number"
+    ? new Date(timestamp * 1000)
+    : new Date(timestamp); // fallback
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric"
+  }).format(date);
+};
 
 onMounted(() => {
   if (route.query.success === "true") {
