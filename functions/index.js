@@ -240,6 +240,7 @@ export const createCheckoutSession = onCall(
       try {
       // Determine the mode based on the priceId
         const mode = priceId === "price_1RAZgSDHHGtkTOPhyhqr29ai" ? "payment" : "subscription";
+        const subType = priceId === "price_1RAZgSDHHGtkTOPhyhqr29ai" ? "Lifetime" : "Monthly";
 
         console.log("Creating Stripe Checkout session with:", {
           payment_method_types: ["card"],
@@ -254,6 +255,7 @@ export const createCheckoutSession = onCall(
           cancel_url: cancelUrl,
           metadata: {
             userId,
+            subType,
           },
         });
 
@@ -270,6 +272,7 @@ export const createCheckoutSession = onCall(
           cancel_url: cancelUrl,
           metadata: {
             userId,
+            subType,
           },
         });
 
@@ -320,33 +323,95 @@ export const handleStripeWebhook = onRequest(
       switch (event.type) {
         case "checkout.session.completed": {
           const session = event.data.object;
-          const userId = session.metadata.userId;
+          const userId = session.metadata?.userId;
+          const subscriptionType = session.metadata?.subType;
+
+          console.log("Processing checkout.session.completed for session:", session.id);
+          console.log("Session metadata:", session.metadata);
 
           if (!userId) {
-            console.error("Missing userId in session metadata.");
-            return res.status(400).send("Invalid session metadata.");
+            console.warn("Missing userId. Cannot process session.");
+            break;
           }
 
-          try {
-            const subscriptionType = session.metadata.subscriptionType || "Monthly";
-            console.log(`Subscription type for user ${userId}: ${subscriptionType}`);
+          const userDocRef = db.collection("members").doc(userId);
+          const customerId = session.customer;
+          const subscriptionId = session.subscription;
 
-            await db.collection("members").doc(userId).set(
-                {
+          if (subscriptionType === "Monthly") {
+            try {
+              console.log(`Handling recurring subscription setup for user: ${userId}`);
+
+              await userDocRef.set(
+                  {
+                    member: true,
+                    subscriptionId,
+                    customerId,
+                    status: "active",
+                    subscriptionType,
+                  },
+                  {merge: true},
+              );
+
+              await admin.auth().setCustomUserClaims(userId, {
+                member: true,
+                proStatus: subscriptionType,
+              });
+
+              console.log(`Subscription activated for user: ${userId} with proStatus: ${subscriptionType}`);
+            } catch (error) {
+              console.error("Error handling subscription activation:", error);
+              return res.status(500).send("Internal Server Error");
+            }
+          } else if (subscriptionType === "Lifetime") {
+            console.log(`Handling one-time payment for Lifetime upgrade for user: ${userId}`);
+
+            try {
+              const existingDoc = await userDocRef.get();
+              const userData = existingDoc.exists ? existingDoc.data() : null;
+
+              if (userData?.subscriptionId) {
+                try {
+                  await stripe.subscriptions.del(userData.subscriptionId);
+                  console.log(`Cancelled existing subscription for user: ${userId}`);
+                } catch (cancelErr) {
+                  console.warn(`Failed to cancel sub ${userData.subscriptionId} for user ${userId}:`, cancelErr);
+                }
+              }
+
+              await userDocRef.set(
+                  {
+                    customerId,
+                    subscriptionId: admin.firestore.FieldValue.delete(),
+                    status: "active",
+                    subscriptionType: "Lifetime",
+                    cancelAt: admin.firestore.FieldValue.delete(),
+                    member: true,
+                  },
+                  {merge: true},
+              );
+
+              try {
+                const user = await admin.auth().getUser(userId);
+                const existingClaims = user.customClaims || {};
+                delete existingClaims.expires;
+
+                await admin.auth().setCustomUserClaims(userId, {
+                  ...existingClaims,
                   member: true,
-                  subscriptionId: session.subscription,
-                  customerId: session.customer,
-                  status: "active",
-                  subscriptionType,
-                },
-                {merge: true},
-            );
+                  proStatus: "Lifetime",
+                });
 
-            await admin.auth().setCustomUserClaims(userId, {member: true, proStatus: subscriptionType});
-            console.log(`Subscription activated for user: ${userId} with proStatus: ${subscriptionType}`);
-          } catch (error) {
-            console.error("Error handling checkout.session.completed:", error);
-            return res.status(500).send("Internal Server Error");
+                console.log(`User ${userId} upgraded to Lifetime successfully.`);
+              } catch (authErr) {
+                console.error(`Failed to update custom claims for user ${userId}:`, authErr);
+              }
+            } catch (err) {
+              console.error("Failed to handle lifetime upgrade:", err);
+              return res.status(500).send("Internal Server Error");
+            }
+          } else {
+            console.warn(`Unknown subscriptionType '${subscriptionType}' for user: ${userId}`);
           }
 
           break;
@@ -418,7 +483,6 @@ export const handleStripeWebhook = onRequest(
 
           break;
         }
-
         default:
           console.log(`Unhandled event type: ${event.type}`);
       }
