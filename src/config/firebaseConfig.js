@@ -20,14 +20,12 @@ const db = getFirestore(firebaseApp)
 const auth = getAuth(firebaseApp)
 const analytics = getAnalytics(firebaseApp)
 
-console.log(import.meta.env.MODE);
-
 if (import.meta.env.MODE === "development") {
     self.FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN;
   }
   
   initializeAppCheck(firebaseApp, {
-    provider: new ReCaptchaV3Provider("YOUR_RECAPTCHA_SITE_KEY"),
+    provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_SITE_KEY),
     isTokenAutoRefreshEnabled: true,
 });
 
