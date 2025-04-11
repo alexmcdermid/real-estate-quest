@@ -264,10 +264,6 @@ export const createCheckoutSession = onCall(
           }
         }
 
-        // prod lifetime price_1RCnE0D0qfc5FtYvebtSnn2E
-        // prod monthyl price_1RCnEeD0qfc5FtYvXYJGJ9Yp
-        // dev lifetime price_1RAZgSDHHGtkTOPhyhqr29ai
-        // dev monthly price_1RAZfIDHHGtkTOPhKGMMIQGn
         console.log("Creating Stripe Checkout session with:", {
           payment_method_types: ["card"],
           mode,
