@@ -138,6 +138,7 @@ import { storeToRefs } from "pinia";
 import useMembership from "../composables/useMembership";
 import LoginModal from "./loginModal.vue";
 import { useRoute, useRouter } from "vue-router";
+import { clearCache } from "@/composables/useQuestion";
 
 const authStore = useAuthStore();
 const { authInitialized, isAuthenticated, proStatus, proExpires } = storeToRefs(authStore);
@@ -165,11 +166,7 @@ function handleSubscriptionClick(type) {
 }
 
 function startCheckoutByType(type) {
-  if (type === "monthly") {
-    startCheckout("price_1RAZfIDHHGtkTOPhKGMMIQGn");
-  } else if (type === "lifetime") {
-    startCheckout("price_1RAZgSDHHGtkTOPhyhqr29ai");
-  }
+  startCheckout(type);
 }
 
 const formatDate = (timestamp) => {
@@ -186,6 +183,8 @@ const formatDate = (timestamp) => {
 
 onMounted(() => {
   if (route.query.success === "true") {
+    console.log("clearing cache");
+    clearCache();
     console.log("Payment successful. Waiting for webhook to update subscription status...");
     router.replace({ query: {} });
   }

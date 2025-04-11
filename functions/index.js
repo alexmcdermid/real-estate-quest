@@ -8,9 +8,12 @@ import Stripe from "stripe"; // Import Stripe
 admin.initializeApp();
 const db = admin.firestore();
 
-// Define secrets for Stripe keys
-const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY"); // Use defineSecret for secure key management
-const stripeWebhookSecret = defineSecret("STRIPE_WEBHOOK_SECRET"); // Define secret for Stripe webhook secret
+const stripeSecretKeyDev = defineSecret("STRIPE_SECRET_KEY_DEV");
+const stripeWebhookSecretDev = defineSecret("STRIPE_WEBHOOK_SECRET_DEV");
+const stripeSecretKeyProd = defineSecret("STRIPE_SECRET_KEY_PROD");
+const stripeWebhookSecretProd = defineSecret("STRIPE_WEBHOOK_SECRET_PROD");
+
+const isProduction = process.env.NODE_ENV === "production";
 
 // Initialize Stripe (lazy initialization in functions)
 let stripe;
@@ -43,6 +46,7 @@ export const getQuestionsByChapter = onCall(
     },
 
     async (request) => {
+      console.log("is prod", isProduction);
       let isPremium = false;
       const authContext = request.auth;
 
@@ -221,9 +225,11 @@ export const createCheckoutSession = onCall(
     {
       region: "us-west1",
       enforceAppCheck: true,
-      secrets: [stripeSecretKey],
+      secrets: [stripeSecretKeyDev, stripeSecretKeyProd],
     },
     async (request) => {
+      console.log("is prod", isProduction);
+      const stripeSecretKey = isProduction ? stripeSecretKeyProd : stripeSecretKeyDev;
       const authContext = request.auth;
 
       if (!authContext || !authContext.uid) {
@@ -232,16 +238,36 @@ export const createCheckoutSession = onCall(
       }
 
       const userId = authContext.uid;
-      const {priceId, successUrl, cancelUrl} = request.data;
+      const {type, successUrl, cancelUrl} = request.data;
 
       // Initialize Stripe with the secret key
       stripe = stripe || new Stripe(stripeSecretKey.value());
 
       try {
       // Determine the mode based on the priceId
-        const mode = priceId === "price_1RAZgSDHHGtkTOPhyhqr29ai" ? "payment" : "subscription";
-        const subType = priceId === "price_1RAZgSDHHGtkTOPhyhqr29ai" ? "Lifetime" : "Monthly";
+        const mode = type === "lifetime" ? "payment" : "subscription";
+        const subType = type === "lifetime" ? "Lifetime" : "Monthly";
 
+        let priceId;
+
+        if (isProduction) {
+          if (type === "lifetime") {
+            priceId = "price_1RCnE0D0qfc5FtYvebtSnn2E"; // prod lifetime
+          } else {
+            priceId = "price_1RCnEeD0qfc5FtYvXYJGJ9Yp"; // prod monthly
+          }
+        } else {
+          if (type === "lifetime") {
+            priceId = "price_1RAZgSDHHGtkTOPhyhqr29ai"; // dev lifetime
+          } else {
+            priceId = "price_1RAZfIDHHGtkTOPhKGMMIQGn"; // dev monthly
+          }
+        }
+
+        // prod lifetime price_1RCnE0D0qfc5FtYvebtSnn2E
+        // prod monthyl price_1RCnEeD0qfc5FtYvXYJGJ9Yp
+        // dev lifetime price_1RAZgSDHHGtkTOPhyhqr29ai
+        // dev monthly price_1RAZfIDHHGtkTOPhKGMMIQGn
         console.log("Creating Stripe Checkout session with:", {
           payment_method_types: ["card"],
           mode,
@@ -289,9 +315,12 @@ export const handleStripeWebhook = onRequest(
     {
       region: "us-west1",
       enforceAppCheck: true,
-      secrets: [stripeSecretKey, stripeWebhookSecret],
+      secrets: [stripeSecretKeyDev, stripeSecretKeyProd, stripeWebhookSecretDev, stripeWebhookSecretProd],
     },
     async (req, res) => {
+      console.log("is prod", isProduction);
+      const stripeSecretKey = isProduction ? stripeSecretKeyProd : stripeSecretKeyDev;
+      const stripeWebhookSecret = isProduction ? stripeWebhookSecretProd : stripeWebhookSecretDev;
       // Initialize Stripe with the secret key
       stripe = stripe || new Stripe(stripeSecretKey.value());
 
@@ -495,7 +524,7 @@ export const manageSubscription = onCall(
     {
       region: "us-west1",
       enforceAppCheck: true,
-      secrets: [stripeSecretKey],
+      secrets: [stripeSecretKeyDev, stripeSecretKeyProd],
     },
     async (request) => {
       const authContext = request.auth;
@@ -504,6 +533,10 @@ export const manageSubscription = onCall(
         console.error("No authenticated user detected.");
         throw new Error("Authentication required");
       }
+
+      console.log("is prod", isProduction);
+
+      const stripeSecretKey = isProduction ? stripeSecretKeyProd : stripeSecretKeyDev;
 
       stripe = stripe || new Stripe(stripeSecretKey.value());
 

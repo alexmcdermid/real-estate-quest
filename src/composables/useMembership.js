@@ -9,7 +9,7 @@ export default function useMembership() {
 
   const functions = getFunctions(firebaseApp, "us-west1");
 
-  async function startCheckout(priceId) {
+  async function startCheckout(type) {
     if (!user.value) {
       console.error("User is not authenticated");
       throw new Error("User is not authenticated");
@@ -19,7 +19,7 @@ export default function useMembership() {
       const createCheckoutSessionCallable = httpsCallable(functions, "createCheckoutSession");
 
       const result = await createCheckoutSessionCallable({
-        priceId,
+        type,
         successUrl: `${window.location.origin}/pro?success=true`,
         cancelUrl: `${window.location.origin}/pro?canceled=true`,
       });

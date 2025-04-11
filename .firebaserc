@@ -1,5 +1,9 @@
 {
   "projects": {
-    "default": "real-estate-quest"
-  }
+    "default": "real-estate-quest",
+    "dev": "real-estate-quest",
+    "prod": "real-estate-quest"
+  },
+  "targets": {},
+  "etags": {}
 }

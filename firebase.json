@@ -27,6 +27,13 @@
         "source": "**",
         "destination": "/index.html"
       }
+    ],
+    "redirects": [
+      {
+        "source": "/",
+        "destination": "https://bcrealestatequest.ca",
+        "type": 301
+      }
     ]
   }
 }

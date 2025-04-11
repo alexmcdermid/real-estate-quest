@@ -20,6 +20,12 @@ npm run build
 npm run lint
 ```
 
+### env
+```
+firebase use dev
+firebase use prod
+```
+
 ### firebase functions deploy
 ```
 firebase deploy --only functions
@@ -28,12 +34,17 @@ npm run lint:fix - in functions folder
 
 ### firebase deploy fe
 ```
-firebase deploy --only hosting
+firebase deploy --only functions -P dev
+firebase deploy --only functions -P prod
+
 ```
 
 ### stripe testing
 ```
 https://docs.stripe.com/testing
+firebase functions:config:set stripe.secret="your_stripe_secret_key"
+firebase functions:config:set stripe.webhook_secret="your_stripe_webhook_secret"
+
 ```
 
 ### Customize configuration
