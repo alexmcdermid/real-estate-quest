@@ -247,14 +247,30 @@ export const handleStripeWebhook = onRequest(
     {
       region: "us-west1",
       enforceAppCheck: true,
-      secrets: [stripeWebhookSecret],
+      secrets: [stripeSecretKey, stripeWebhookSecret],
     },
     async (req, res) => {
+      // Initialize Stripe with the secret key
+      stripe = stripe || new Stripe(stripeSecretKey.value());
+
       const sig = req.headers["stripe-signature"];
+
+      console.log("Stripe Webhook Details:", {
+        rawBody: req.rawBody.toString(),
+        signature: sig,
+        stripeSecretKey: stripeSecretKey.value(),
+        stripeWebhookSecret: stripeWebhookSecret.value(),
+        eventType: req.body.type,
+        eventData: req.body.data,
+      });
       let event;
 
-      // Verify the webhook signature
+      // Use rawBody instead of req.body
       try {
+        if (!req.rawBody) {
+          throw new Error("Raw body is not available. Ensure Firebase Functions is configured correctly.");
+        }
+
         event = stripe.webhooks.constructEvent(req.rawBody, sig, stripeWebhookSecret.value());
       } catch (err) {
         console.error("Webhook signature verification failed:", err.message);
@@ -267,36 +283,25 @@ export const handleStripeWebhook = onRequest(
           const session = event.data.object;
           const userId = session.metadata.userId;
 
-          // Validate the userId from metadata
           if (!userId) {
             console.error("Missing userId in session metadata.");
             return res.status(400).send("Invalid session metadata.");
           }
 
           try {
-          // Check if the user exists in Firestore
-            const userDoc = await db.collection("members").doc(userId).get();
-            if (!userDoc.exists) {
-              console.error(`User with ID ${userId} does not exist.`);
-              return res.status(404).send("User not found.");
-            }
-
-            // Determine subscription type (Monthly or Lifetime)
-            const subscriptionType = session.metadata.subscriptionType || "Monthly"; // Default to Monthly
+            const subscriptionType = session.metadata.subscriptionType || "Monthly";
             console.log(`Subscription type for user ${userId}: ${subscriptionType}`);
 
-            // Update Firestore with the user's subscription status
             await db.collection("members").doc(userId).set(
                 {
                   member: true,
                   subscriptionId: session.subscription,
                   status: "active",
-                  subscriptionType, // Store the subscription type in Firestore
+                  subscriptionType,
                 },
                 {merge: true},
             );
 
-            // Set custom claims with proStatus
             await admin.auth().setCustomUserClaims(userId, {member: true, proStatus: subscriptionType});
             console.log(`Subscription activated for user: ${userId} with proStatus: ${subscriptionType}`);
           } catch (error) {
@@ -306,105 +311,40 @@ export const handleStripeWebhook = onRequest(
 
           break;
         }
-
         case "customer.subscription.deleted":
-        case "invoice.payment_failed": {
-          const subscription = event.data.object;
-          const userId = subscription.metadata.userId;
-
-          // Validate the userId from metadata
-          if (!userId) {
-            console.error("Missing userId in subscription metadata.");
-            return res.status(400).send("Invalid subscription metadata.");
+          case "invoice.payment_failed": {
+            const subscription = event.data.object;
+            const userId = subscription.metadata.userId;
+  
+            if (!userId) {
+              console.error("Missing userId in subscription metadata.");
+              return res.status(400).send("Invalid subscription metadata.");
+            }
+  
+            try {
+              await db.collection("members").doc(userId).set(
+                  {
+                    member: false,
+                    status: "inactive",
+                    subscriptionType: null,
+                  },
+                  {merge: true},
+              );
+  
+              await admin.auth().setCustomUserClaims(userId, {member: false, proStatus: null});
+              console.log(`Subscription marked inactive for user: ${userId}`);
+            } catch (error) {
+              console.error("Error handling subscription deletion or payment failure:", error);
+              return res.status(500).send("Internal Server Error");
+            }
+  
+            break;
           }
-
-          try {
-          // Update Firestore to mark the subscription as inactive
-            await db.collection("members").doc(userId).set(
-                {
-                  member: false,
-                  status: "inactive",
-                  subscriptionType: null, // Clear subscription type
-                },
-                {merge: true},
-            );
-
-            // Remove proStatus from custom claims
-            await admin.auth().setCustomUserClaims(userId, {member: false, proStatus: null});
-            console.log(`Subscription marked inactive for user: ${userId}`);
-          } catch (error) {
-            console.error("Error handling subscription deletion or payment failure:", error);
-            return res.status(500).send("Internal Server Error");
-          }
-
-          break;
-        }
 
         default:
           console.log(`Unhandled event type: ${event.type}`);
       }
 
       res.status(200).send("Webhook received");
-    },
-);
-
-export const verifyPaymentStatus = onCall(
-    {
-      region: "us-west1",
-      enforceAppCheck: true,
-      secrets: [stripeSecretKey],
-    },
-    async (request) => {
-      let userId;
-      const authContext = request.auth;
-
-      if (authContext && authContext.uid) {
-        userId = authContext.uid;
-      } else {
-        console.log("No authenticated user detected.");
-        throw new Error("Authentication required");
-      }
-
-      const {sessionId} = request.data;
-
-      // Initialize Stripe with the secret key
-      stripe = stripe || new Stripe(stripeSecretKey.value());
-
-      try {
-      // Retrieve the Checkout session from Stripe
-        console.log("Retrieving Stripe session with sessionId:", sessionId);
-        const session = await stripe.checkout.sessions.retrieve(sessionId);
-
-        // Verify that the session is completed and belongs to the authenticated user
-        if (session.payment_status === "paid" && session.metadata.userId === userId) {
-          console.log(`Payment verified for user: ${userId}`);
-
-          // Update Firestore with the user's subscription status
-          const subscriptionType = session.metadata.subscriptionType || "Monthly"; // Default to Monthly
-          console.log(`Updating Firestore for user ${userId} with subscription type: ${subscriptionType}`);
-          await db.collection("members").doc(userId).set(
-              {
-                member: true,
-                subscriptionId: session.subscription,
-                status: "active",
-                subscriptionType,
-              },
-              {merge: true},
-          );
-
-          // Set custom claims with proStatus
-          console.log(`Setting custom claims for user ${userId}`);
-          await admin.auth().setCustomUserClaims(userId, {member: true, proStatus: subscriptionType});
-          console.log(`Subscription activated for user: ${userId} with proStatus: ${subscriptionType}`);
-
-          return {success: true, subscriptionType};
-        } else {
-          console.error("Payment verification failed or session does not belong to the user.");
-          throw new Error("Payment verification failed");
-        }
-      } catch (error) {
-        console.error("Error verifying payment status:", error);
-        throw new Error("Failed to verify payment status");
-      }
     },
 );

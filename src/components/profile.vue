@@ -41,7 +41,7 @@
         <template v-else>
           <v-card-title>Upgrade to Pro</v-card-title>
           <v-card-text>
-            <p>Pass your BC Real Estate Licensing Exam on the first try with confidence!</p>
+            <p class="pb-1">Pass your BC Real Estate Licensing Exam on the first try with confidence!</p>
             <p>Get access today and unlock 800+ high-quality practice questions. Look forward to upcoming flashcards and new questions to keep you one step ahead.</p>
             <v-row class="mt-4">
               <v-col cols="12" md="6">
@@ -108,7 +108,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from "vue";
+import { ref, onMounted } from "vue";
 import { useAuthStore } from "../composables/useAuth";
 import { storeToRefs } from "pinia";
 import useMembership from "../composables/useMembership";
@@ -118,7 +118,7 @@ import { useRoute, useRouter } from "vue-router";
 const authStore = useAuthStore();
 const { authInitialized, isAuthenticated, proStatus } = storeToRefs(authStore);
 
-const { startCheckout, verifyPayment } = useMembership();
+const { startCheckout, manageSubscription } = useMembership();
 const route = useRoute();
 const router = useRouter();
 
@@ -142,53 +142,10 @@ function handleSubscriptionClick(type) {
   }
 }
 
-function manageSubscription() {
-  console.log("Redirect to subscription management");
-  // Implement logic to redirect to Stripe's customer portal
-}
-
-async function handlePaymentSuccess() {
-  const sessionId = route.query.sessionId;
-
-  if (!sessionId) {
-    console.error("No sessionId found in the URL.");
-    return;
-  }
-
-  if (!isAuthenticated.value) {
-    console.error("User is not authenticated. Waiting for authentication...");
-    const stopWatch = watch(
-      () => isAuthenticated.value,
-      (newVal) => {
-        if (newVal) {
-          console.log("User is now authenticated. Proceeding with payment verification...");
-          stopWatch();
-          handlePaymentSuccess();
-        }
-      }
-    );
-    return;
-  }
-
-  try {
-    const result = await verifyPayment(sessionId);
-
-    if (result.success) {
-      console.log("Payment verified successfully. Subscription type:", result.subscriptionType);
-    } else {
-      console.error("Payment verification failed.");
-    }
-  } catch (error) {
-    console.error("Error verifying payment status:", error);
-  } finally {
-    router.replace({ query: {} });
-  }
-}
-
 onMounted(() => {
   if (route.query.success === "true") {
-    console.log("Success query parameter detected. Calling handlePaymentSuccess...");
-    handlePaymentSuccess();
+    console.log("Payment successful. Waiting for webhook to update subscription status...");
+    router.replace({ query: {} });
   }
 });
 </script>
