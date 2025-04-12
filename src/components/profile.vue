@@ -183,9 +183,7 @@ const formatDate = (timestamp) => {
 
 onMounted(() => {
   if (route.query.success === "true") {
-    console.log("clearing cache");
     clearCache();
-    console.log("Payment successful. Waiting for webhook to update subscription status...");
     router.replace({ query: {} });
   }
 });

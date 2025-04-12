@@ -69,7 +69,6 @@ async function handleGooglyLogin() {
   isLoggingIn.value = true; // Start loading
   try {
     await authStore.googlyLogin();
-    console.log("Google login successful via modal action, closing modal.");
     window.location.reload();
   } catch (error) {
     console.error("Google Login failed:", error);

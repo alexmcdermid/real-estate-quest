@@ -38,17 +38,13 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = currentUser;
 
     try {
-      console.log(`Fetching claims for user ${currentUser.uid}`);
-
       // Force refresh the ID token to get updated custom claims
       const idTokenResult = await currentUser.getIdTokenResult(true); // Force token refresh
       const currentProStatus = idTokenResult.claims.proStatus || null;
       const currentExpiry = idTokenResult.claims.expires || null;
 
       proStatus.value = currentProStatus; // Update proStatus
-      console.log(`Claims updated. proStatus: ${proStatus.value}`);
       proExpires.value = currentExpiry; // Update proExpires
-      console.log(`Claims updated. proExpires: ${proExpires.value}`);
     } catch (error) {
       console.error("Error getting ID token result/claims:", error);
       proStatus.value = null;
@@ -57,10 +53,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function forceClaimRefresh() {
     if (user.value) { // Only run if user is logged in
-      console.log("Action forceClaimRefresh called.");
       await fetchClaimsAndSetState(user.value); // Re-run the claim fetching
-    } else {
-      console.warn("forceClaimRefresh called but user is not logged in.");
     }
   }
 
@@ -112,12 +105,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   // --- Listener Setup (runs once when store is initialized) ---
   function initializeAuthListener() {
-      console.log("Setting up Pinia onAuthStateChanged listener...");
       onAuthStateChanged(auth, async (currentUser) => {
-        console.log("Pinia onAuthStateChanged triggered. User:", currentUser ? currentUser.uid : 'null');
         await fetchClaimsAndSetState(currentUser); // Fetch claims and update state refs
         authInitialized.value = true; // Mark as initialized AFTER processing
-        console.log("Pinia Auth state updated. Initialized:", authInitialized.value, "Authenticated:", isAuthenticated.value, "isPro:", isPro.value, "Status:", proStatus.value, "Expires:", proExpires.value);
       });
   }
 
