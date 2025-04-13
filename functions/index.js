@@ -14,6 +14,10 @@ const stripeWebhookSecretDev = defineSecret("STRIPE_WEBHOOK_SECRET_DEV");
 const stripeSecretKeyProd = defineSecret("STRIPE_SECRET_KEY_PROD");
 const stripeWebhookSecretProd = defineSecret("STRIPE_WEBHOOK_SECRET_PROD");
 
+const githubToken = defineSecret("GITHUB_TOKEN");
+const githubUsername = defineSecret("GITHUB_USERNAME");
+const githubRepo = defineSecret("GITHUB_REPO");
+
 const isProduction = process.env.NODE_ENV === "production";
 
 // Initialize Stripe (lazy initialization in functions)
@@ -105,14 +109,16 @@ export const importQuestionsFromRepo = onSchedule(
       schedule: "0 0 * * *",
       timeZone: "America/Los_Angeles",
       region: "us-west1",
+      secrets: [githubToken, githubUsername, githubRepo],
     },
-    async (context) => {
+    async () => {
       try {
-        const token = process.env.GITHUB_TOKEN;
-        const username = process.env.GITHUB_USERNAME;
-        const repo = process.env.GITHUB_REPO;
+        const token = githubToken.value();
+        const username = githubUsername.value();
+        const repo = githubRepo.value();
+
         if (!token || !username || !repo) {
-          console.error("Missing repo credentials");
+          console.error("Missing GitHub credentials");
           return;
         }
 
