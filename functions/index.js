@@ -53,9 +53,10 @@ export const getQuestionsByChapter = onCall(
 
       if (authContext && authContext.uid) {
         const proStatus = authContext.token?.proStatus;
-        console.log(`User ${authContext.uid} - checking proStatus claim: '${proStatus}'`);
+        const member = authContext.token?.member;
+        console.log(`User ${authContext.uid} - checking member claim: '${member}' - checking proStatus claim: '${proStatus}'`);
 
-        if (proStatus === "Monthly" || proStatus === "Lifetime") {
+        if (member === true && (proStatus === "Monthly" || proStatus === "Lifetime")) {
           isPremium = true;
           console.log(`User ${authContext.uid} IS premium.`);
         } else {
@@ -210,7 +211,6 @@ export const expireCanceledMemberships = onSchedule(
         batch.set(doc.ref, {
           member: false,
           subscriptionType: null,
-          status: "inactive",
           cancelAt: admin.firestore.FieldValue.delete(),
         }, {merge: true});
 
@@ -373,7 +373,6 @@ export const handleStripeWebhook = onRequest(
                     member: true,
                     subscriptionId,
                     customerId,
-                    status: "active",
                     subscriptionType,
                   },
                   {merge: true},
@@ -409,7 +408,6 @@ export const handleStripeWebhook = onRequest(
                   {
                     customerId,
                     subscriptionId: admin.firestore.FieldValue.delete(),
-                    status: "active",
                     subscriptionType: "Lifetime",
                     cancelAt: admin.firestore.FieldValue.delete(),
                     member: true,
