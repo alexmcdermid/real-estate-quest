@@ -18,9 +18,10 @@ export const useAuthStore = defineStore('auth', () => {
   // --- State ---
   const auth = getAuth(firebaseApp); // Keep auth instance reference if needed by actions
   const user = ref(null);
+  const member = ref(null);
   const proStatus = ref(null); // Raw status from claims
-  const authInitialized = ref(false); // Tracks initial listener run
   const proExpires = ref(null);
+  const authInitialized = ref(false); // Tracks initial listener run
 
   // --- Getters (Computed State) ---
   const isAuthenticated = computed(() => !!user.value); // Derive from user state
@@ -30,6 +31,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchClaimsAndSetState(currentUser) {
     if (!currentUser) {
       user.value = null;
+      member.value = null;
       proStatus.value = null;
       return; // Exit early if no user
     }
@@ -40,14 +42,18 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       // Force refresh the ID token to get updated custom claims
       const idTokenResult = await currentUser.getIdTokenResult(true); // Force token refresh
+      const currentMember = idTokenResult.claims.member || null;
       const currentProStatus = idTokenResult.claims.proStatus || null;
       const currentExpiry = idTokenResult.claims.expires || null;
 
+      member.value = currentMember; // Update member
       proStatus.value = currentProStatus; // Update proStatus
       proExpires.value = currentExpiry; // Update proExpires
     } catch (error) {
       console.error("Error getting ID token result/claims:", error);
+      member.value = null;
       proStatus.value = null;
+      proExpires.value = null; 
     }
   }
 

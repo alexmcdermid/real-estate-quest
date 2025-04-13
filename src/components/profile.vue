@@ -2,7 +2,7 @@
   <v-container>
     <v-card class="mb-4">
       <template v-if="authInitialized">
-        <template v-if="isAuthenticated && proStatus">
+        <template v-if="isAuthenticated && member && proStatus">
           <template v-if="proStatus === 'Lifetime'">
             <v-card-title>Pro Status: Lifetime</v-card-title>
             <v-card-text>
@@ -141,7 +141,7 @@ import { useRoute, useRouter } from "vue-router";
 import { clearCache } from "@/composables/useQuestion";
 
 const authStore = useAuthStore();
-const { authInitialized, isAuthenticated, proStatus, proExpires } = storeToRefs(authStore);
+const { authInitialized, isAuthenticated, member, proStatus, proExpires } = storeToRefs(authStore);
 
 const { startCheckout, manageSubscription } = useMembership();
 const route = useRoute();
