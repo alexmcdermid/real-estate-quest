@@ -127,6 +127,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     // State (Refs)
     user,
+    member,
     proStatus,
     authInitialized,
     proExpires,
