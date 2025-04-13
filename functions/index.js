@@ -1,3 +1,4 @@
+import {onDocumentUpdated} from "firebase-functions/v2/firestore";
 import {onCall, onRequest} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import {defineSecret} from "firebase-functions/params";
@@ -561,3 +562,62 @@ export const manageSubscription = onCall(
       }
     },
 );
+
+export const syncClaimsOnManualUpdate = onDocumentUpdated(
+    {
+      document: "members/{userId}",
+      region: "us-west1",
+    },
+    async (event) => {
+      const userId = event.params.userId;
+
+      const beforeSnap = event.data?.before;
+      const afterSnap = event.data?.after;
+
+      if (!beforeSnap || !afterSnap) {
+        console.log(`Snapshot data missing for event on user: ${userId}. Skipping.`);
+        return null;
+      }
+
+      const beforeData = beforeSnap.data();
+      const afterData = afterSnap.data();
+
+      if (beforeData?.manualClaimSyncRequired !== true && afterData?.manualClaimSyncRequired === true) {
+        console.log(`Manual claim sync triggered for user: ${userId}`);
+
+        const desiredClaims = {
+          member: afterData.member === true,
+          proStatus: afterData.subscriptionType || null,
+          expires: afterData.cancelAt ? afterData.cancelAt.seconds : null,
+        };
+
+        try {
+          const user = await admin.auth().getUser(userId);
+          const currentClaims = user.customClaims || {};
+
+          const currentClaimsToCompare = {
+            member: currentClaims.member === true,
+            proStatus: currentClaims.proStatus || null,
+            expires: currentClaims.expires || null,
+          };
+
+          const needsUpdate = JSON.stringify(desiredClaims) !== JSON.stringify(currentClaimsToCompare);
+
+          if (needsUpdate) {
+            console.log(`Updating claims for user ${userId}:`, desiredClaims);
+            await admin.auth().setCustomUserClaims(userId, desiredClaims);
+          } else {
+            console.log(`Claims for user ${userId} are already up-to-date.`);
+          }
+
+          await afterSnap.ref.update({
+            manualClaimSyncRequired: false,
+          });
+
+          console.log(`Successfully processed manual claim sync and reset flag for user: ${userId}`);
+        } catch (error) {
+          console.error(`Error updating claims or resetting flag for user ${userId}:`, error);
+        }
+      }
+      return null;
+    });

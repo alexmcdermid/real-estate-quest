@@ -29,7 +29,7 @@ firebase use prod
 ### firebase functions deploy
 ```
 firebase deploy --only functions
-npm run lint:fix - in functions folder
+npm run lint:fix
 ```
 
 ### firebase deploy fe
