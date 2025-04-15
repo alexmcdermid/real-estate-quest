@@ -51,6 +51,20 @@
                 @questionReset="markQuestionReset(index)"
               />
             </v-col>
+            <v-col 
+            v-if="questions.length == 0"
+            cols="12"
+            md="6"
+            >
+              <v-card>
+                <v-card-title class="preformatted text-center">
+                  No questions available for this chapter.
+                </v-card-title>
+                <v-card-text class="text-center">
+                  Content coming soon, please check back later.
+                </v-card-text>
+              </v-card>
+            </v-col>
           </template>
         </v-row>
       </v-col>
@@ -70,7 +84,7 @@ import useOptions from "../composables/useOption";
 import { chapters } from "@/constants/chapters";
 
 const authStore = useAuthStore();
-const { authInitialized } = storeToRefs(authStore);
+const { authInitialized, isPro } = storeToRefs(authStore);
 
 const { options } = useOptions();
 
@@ -92,7 +106,7 @@ const questionsWithProCard = computed(() => {
     },
   }));
 
-  if (questions.value.length < 10) {
+  if (!isPro.value) {
     const middleIndex = Math.floor(questionItems.length / 2);
     questionItems.splice(middleIndex, 0, {
       component: ProCard,
@@ -171,3 +185,10 @@ function shuffleArray(array) {
   return array;
 }
 </script>
+
+<style scoped>
+.preformatted {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+</style>
