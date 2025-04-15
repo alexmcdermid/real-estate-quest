@@ -13,7 +13,7 @@
         <v-divider class="my-4"></v-divider>
         <!-- Email Login Option -->
         <div v-if="!showEmailInput">
-          <v-btn block class="email-login" @click="toggleEmailInput" title="Email Link Login: You will receive a login link via email.">
+          <v-btn block class="email-login" @click="toggleEmailInput">
             Sign in with Email
           </v-btn>
         </div>
@@ -33,7 +33,7 @@
             :disabled="!isValidEmail || emailSent"
             @click="handleEmailLinkLogin"
           >
-            {{ emailSent ? "Email Sent" : "Send Email Link" }}
+            {{ emailSent ? "Email Sent - Check Inbox" : "Send Email Link" }}
           </v-btn>
         </div>
       </v-card-text>
