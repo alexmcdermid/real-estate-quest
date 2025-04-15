@@ -202,6 +202,7 @@ export const expireCanceledMemberships = onSchedule(
 
       const snapshot = await db.collection("members")
           .where("cancelAt", "<=", now)
+          .where("subscriptionType", "==", "Monthly")
           .get();
 
       if (snapshot.empty) {
