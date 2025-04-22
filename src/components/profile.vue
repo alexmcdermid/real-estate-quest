@@ -11,31 +11,35 @@
           </template>
 
           <template v-else-if="proStatus === 'Monthly'">
-            <v-col cols="12" md="6">
-              <v-hover>
-                <template #default="{ isHovering }">
-                  <v-card
-                    outlined
-                    :elevation="isHovering ? 8 : 2"
-                    class="clickable-card"
-                    @click="manageSubscription"
-                  >
-                    <v-card-title>Pro Status: Monthly</v-card-title>
-                    <v-card-text>
-                      <p v-if="proExpires">Your subscription expires: {{ formatDate(proExpires) }}. You can manage your subscription below.</p>
-                      <p v-else>Your subscription is active. You can manage your subscription below.</p>
-                    </v-card-text>
-                    <v-card-actions>
-                      <v-btn color="primary" @click.stop="manageSubscription">
-                        Manage Subscription
-                      </v-btn>
-                    </v-card-actions>
-                  </v-card>
-                </template>
-              </v-hover>
-            </v-col>
-            <v-col cols="12" md="6">
-              <v-hover>
+            <v-card-title>Manage Pro Status</v-card-title>
+            <v-card-text>
+              <v-row>
+                <v-col cols="12" md="6">
+                  <v-hover>
+                    <template #default="{ isHovering }">
+                      <v-card
+                        outlined
+                        :elevation="isHovering ? 8 : 2"
+                        class="clickable-card"
+                        @click="manageSubscription"
+                      >
+                        <v-card-title>Pro Status: Monthly</v-card-title>
+                        <v-card-text>
+                          <p v-if="proExpires">Your subscription expires: {{ formatDate(proExpires) }}.</p>
+                          <p v-else>Your subscription is active.</p>
+                          <p>You can manage your subscription below.</p>
+                        </v-card-text>
+                        <v-card-actions>
+                          <v-btn color="primary" @click.stop="manageSubscription">
+                            Manage Subscription
+                          </v-btn>
+                        </v-card-actions>
+                      </v-card>
+                    </template>
+                  </v-hover>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <v-hover>
                     <template #default="{ isHovering }">
                       <v-card
                         outlined
@@ -57,6 +61,8 @@
                     </template>
                   </v-hover>
                 </v-col>
+              </v-row>
+            </v-card-text>
           </template>
           <template v-else>
             <v-card-text>Checking subscription status...</v-card-text>
