@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://bcrealestatequest.ca/sitemap.xml
