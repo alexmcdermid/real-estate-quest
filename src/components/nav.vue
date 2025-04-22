@@ -2,7 +2,7 @@
   <v-app-bar app flat color="#0D3B66" :dark="isDark" :light="!isDark">
     <!-- Left-aligned navigation -->
     <v-btn icon class="nav-text" @click="navigateTo('/')">
-      <v-icon>mdi-home</v-icon>
+      <img src="/favicon.ico" alt="Home" style="width: 24px; height: 24px;" />
     </v-btn>
 
     <!-- Centered Questions Button -->
