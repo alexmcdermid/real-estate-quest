@@ -190,6 +190,11 @@ onMounted(() => {
   background: #218838;
 }
 
+.email-login-button:disabled {
+  background: #4caf50;
+  color: white;
+}
+
 .login-blurb {
   font-size: 13px !important;
   color: #666;
