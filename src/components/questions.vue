@@ -2,7 +2,7 @@
   <v-container>
     <v-row>
       <v-col cols="12" class="d-flex align-items-center justify-space-between">
-        <h2>Quiz Questions (Chapter {{ selectedChapter }})</h2>
+        <h2>Quiz Questions - Chapter {{ selectedChapter }}</h2>
         <v-btn
           v-if="hasCompletedQuestions"
           color="error"
@@ -20,6 +20,10 @@
           outlined
           dense
           class="mb-4"
+          :item-title="item => `${item.id} - ${item.name}`"
+          :item-value="item => item.id"
+          :return-object="false"
+          :value="1"
         />
       </v-col>
       <v-col cols="12">

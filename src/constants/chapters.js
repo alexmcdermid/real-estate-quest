@@ -1,1 +1,22 @@
-export const chapters = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+export const chapters = [
+  { id: 1, name: "Fundamentals of Law and the Real Estate Services Act" },
+  { id: 2, name: "Estates and Interests in Land, The Subdivision of Land, and Title Registration" },
+  { id: 3, name: "The Professional Liability of Real Estate Licensees" },
+  { id: 4, name: "Commercial and Residential Tenancies and Strata Properties" },
+  { id: 5, name: "Financial Statements" },
+  { id: 6, name: "Professionalism and Ethics" },
+  { id: 7, name: "The Law of Contract" },
+  { id: 8, name: "Contracts for Real Estate Transactions and Law of Agency" },
+  { id: 9, name: "Introduction to Mortgage Finance" },
+  { id: 10, name: "Interest Rates and Mortgages" },
+  { id: 11, name: "Introduction to Mortgage Law" },
+  { id: 12, name: "Mortgage Analysis in Real Estate Practice" },
+  { id: 13, name: "Mortgage Underwriting and Borrower Qualification" },
+  { id: 14, name: "Local Government Law and Taxes on Real Property" },
+  { id: 15, name: "Building Design and Construction" },
+  { id: 16, name: "Introduction to Real Estate Appraisal" },
+  { id: 17, name: "Direct Comparison (Comparative) and Cost Approaches of Appraisal" },
+  { id: 18, name: "The Income or Investment Approach of Appraisal" },
+  { id: 19, name: "From Contract to Completion" },
+  { id: 20, name: "Marketing and Technology and the Real Estate Licensee" }
+];
