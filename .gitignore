@@ -26,3 +26,4 @@ pnpm-debug.log*
 
 .firebase-debug.log
 functions/firebase-debug.log
+.firebase/hosting*
