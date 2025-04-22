@@ -111,13 +111,17 @@ function resetQuestion() {
   emit("questionReset", props.questionIndex);
 }
 
-// Format line breaks in question text.
+// Format line breaks and bold text in question text.
 const formattedQuestion = computed(() => {
-  return props.question.question.replace(/\n/g, '<br><br>');
+  return props.question.question
+    .replace(/\n/g, '<br><br>')
+    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
 });
 
 const formattedSharedText = computed(() => {
-  return sharedText.value ? sharedText.value.replace(/\n/g, '<br>') : '';
+  return sharedText.value
+    ? sharedText.value.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+    : '';
 });
 
 const formattedExplanation = computed(() => {

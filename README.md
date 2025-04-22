@@ -13,6 +13,7 @@ npm run dev
 ### Compiles and minifies for production
 ```
 npm run build
+firebase deploy --only hosting
 ```
 
 ### Lints and fixes files
