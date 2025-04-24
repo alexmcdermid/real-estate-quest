@@ -17,7 +17,7 @@
     </v-btn>
 
     <!-- Dark/Light Mode Toggle -->
-    <v-btn icon @click="toggleDarkMode">
+    <v-btn icon @click="toggleDarkMode" aria-label="Toggle dark mode">
       <v-icon>{{ darkModeIcon }}</v-icon>
     </v-btn>
 
