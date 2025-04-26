@@ -1,16 +1,18 @@
 <template>
   <v-container>
     <v-row>
-      <v-col cols="12" class="d-flex align-items-center justify-space-between">
-        <h2>Quiz Questions - Chapter {{ selectedChapter }}</h2>
-        <v-btn
-          v-if="hasCompletedQuestions"
-          color="error"
-          outlined
-          @click="resetAllQuestions"
-        >
-          Reset All
-        </v-btn>
+      <v-col cols="12" class="d-flex flex-column flex-md-row align-items-center justify-space-around justify-md-space-between">
+        <h2 class="mb-2 mb-md-0 text-center text-md-start mx-auto mx-md-0">Quiz Questions - Chapter {{ selectedChapter }}</h2>
+        <div v-if="hasCompletedQuestions" class="d-flex align-items-center align-self-center w-100 w-md-auto justify-center justify-md-start">
+          <span class="question-counter">Answered: {{ completedQuestions.size }} / {{ questions.length }}</span>
+          <v-btn
+            color="error"
+            outlined
+            @click="resetAllQuestions"
+          >
+            Reset All
+          </v-btn>
+        </div>
       </v-col>
       <v-col cols="12">
         <v-select
@@ -71,6 +73,18 @@
             </v-col>
           </template>
         </v-row>
+      </v-col>
+      <v-col cols="12" class="d-flex align-items-center justify-space-around justify-md-end">
+        <div v-if="hasCompletedQuestions" class="d-flex align-items-center">
+          <span class="question-counter">Answered: {{ completedQuestions.size }} / {{ questions.length }}</span>
+          <v-btn
+            color="error"
+            outlined
+            @click="resetAllQuestions"
+          >
+            Reset All
+          </v-btn>
+        </div>
       </v-col>
     </v-row>
   </v-container>
@@ -151,6 +165,7 @@ async function loadQuestions() {
 
 watch(selectedChapter, () => {
   isLoading.value = true;
+  completedQuestions.value = new Set();
   loadQuestions();
 });
 
@@ -194,5 +209,11 @@ function shuffleArray(array) {
 .preformatted {
   white-space: pre-wrap;
   word-break: break-word;
+}
+.question-counter {
+  font-weight: 500;
+  margin-right: 8px;
+  display: flex;
+  align-items: center;
 }
 </style>

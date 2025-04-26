@@ -10,7 +10,7 @@ npm install
 npm run dev
 ```
 
-### Compiles and minifies for production
+### Compiles and minifies for production - uses .env.production by default
 ```
 npm run build
 firebase deploy --only hosting
