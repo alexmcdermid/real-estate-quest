@@ -163,6 +163,13 @@ function navigateToPro() {
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.2);
 }
 
+.why-card .v-card-title {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  word-break: break-word;
+}
+
 .cta-section h2 {
   font-size: 2rem;
   font-weight: bold;
