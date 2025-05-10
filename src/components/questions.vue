@@ -94,6 +94,7 @@
 import { ref, watch, onMounted, computed } from "vue";
 import { useAuthStore } from "../composables/useAuth";
 import { storeToRefs } from "pinia";
+import { useRoute, useRouter } from "vue-router";
 
 import { fetchQuestionsByChapter } from "../composables/useQuestion";
 import QuestionCard from "./questionCard.vue";
@@ -112,6 +113,9 @@ const questions = ref([]);
 const completedQuestions = ref(new Set());
 const shuffled = computed(() => options.shuffled);
 const resetAll = ref(false);
+
+const route = useRoute();
+const router = useRouter();
 
 const questionsWithProCard = computed(() => {
   const questionItems = questions.value.map((q, index) => ({
@@ -175,6 +179,14 @@ watch(shuffled, () => {
 });
 
 onMounted(() => {
+  // Check for ch query param on mount
+  const chParam = parseInt(route.query.ch);
+  if (!isNaN(chParam) && chapters.some(c => c.id === chParam)) {
+    selectedChapter.value = chParam;
+    // Remove ch param from URL after using it
+    const { ch, ...rest } = route.query;
+    router.replace({ query: { ...rest } });
+  }
   if (authInitialized.value) {
     loadQuestions();
   } else {
