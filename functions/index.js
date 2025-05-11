@@ -164,6 +164,95 @@ export const getFlashCardsByChapter = onCall(
     },
 );
 
+export const importFlashCardsFromRepo = onSchedule(
+    {
+      schedule: "0 1 * * *", // Run at 1:00 AM daily (1 hour after questions import)
+      timeZone: "America/Los_Angeles",
+      region: "us-west1",
+      secrets: [githubToken, githubUsername, githubRepo],
+    },
+    async () => {
+      try {
+        const token = githubToken.value();
+        const username = githubUsername.value();
+        const repo = githubRepo.value();
+
+        if (!token || !username || !repo) {
+          console.error("Missing GitHub credentials");
+          return;
+        }
+
+        const metadataRef = db.collection("metadata").doc("flashcards");
+
+        // Get existing metadata document for hash
+        const metadataDoc = await metadataRef.get();
+        const metadata = metadataDoc.exists ? metadataDoc.data() : {};
+
+        // The file path for flashcards in the repo
+        const repoUrl = `https://api.github.com/repos/${username}/${repo}/contents/flashcards.js`;
+
+        const response = await fetch(repoUrl, {
+          headers: {Authorization: `token ${token}`},
+        });
+        const data = await response.json();
+        
+        if (!data.content) {
+          console.error("No content found in the flashcards.js file from GitHub");
+          return;
+        }
+
+        // Decode the file content (GitHub returns the content in base64)
+        const jsonStr = Buffer.from(data.content, "base64").toString("utf8");
+
+        // Compute a SHA-256 hash of the JSON string
+        const newHash = crypto.createHash("sha256").update(jsonStr).digest("hex");
+        const storedHash = metadata.hash || null;
+        
+        if (storedHash === newHash) {
+          console.log("No changes detected for flashcards; skipping update.");
+          return;
+        }
+
+        // Parse the flashcards (json)
+        const flashcards = JSON.parse(jsonStr);
+        console.log(`Fetched ${flashcards.length} flashcards from repo`);
+
+        // Delete all existing flashcards
+        const flashcardsQuerySnapshot = await db.collection("flashcards").get();
+        const deleteBatch = db.batch();
+        flashcardsQuerySnapshot.docs.forEach((doc) => {
+          deleteBatch.delete(doc.ref);
+        });
+        await deleteBatch.commit();
+        console.log("Cleared all existing flashcards");
+
+        // Add new flashcards in batches (max 500 batch size)
+        const batchSize = 400;
+        let batchCount = 0;
+        
+        for (let i = 0; i < flashcards.length; i += batchSize) {
+          const batch = db.batch();
+          const batchItems = flashcards.slice(i, i + batchSize);
+          
+          batchItems.forEach((flashcard) => {
+            const docRef = db.collection("flashcards").doc();
+            batch.set(docRef, flashcard);
+          });
+          
+          await batch.commit();
+          batchCount++;
+          console.log(`Imported batch ${batchCount} (${batchItems.length} flashcards)`);
+        }
+
+        // Update the stored hash in metadata
+        await metadataRef.set({ hash: newHash });
+        console.log(`Flashcards imported successfully. Updated metadata hash.`);
+      } catch (error) {
+        console.error("Error importing flashcards:", error);
+      }
+    },
+);
+
 export const importQuestionsFromRepo = onSchedule(
     {
       schedule: "0 0 * * *",
@@ -212,7 +301,7 @@ export const importQuestionsFromRepo = onSchedule(
             continue;
           }
 
-          // Parse the questions (assume the file is valid JSON array)
+          // Parse the questions (json)
           const questions = JSON.parse(jsonStr);
           console.log(`Fetched questions for chapter ${chapter} from repo:`, questions);
 
