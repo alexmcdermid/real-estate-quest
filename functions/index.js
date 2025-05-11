@@ -104,6 +104,66 @@ export const getQuestionsByChapter = onCall(
     },
 );
 
+export const getFlashCardsByChapter = onCall(
+    {
+      region: "us-west1",
+      enforceAppCheck: true,
+    },
+
+    async (request) => {
+      console.log("is prod", isProduction);
+      let isPremium = false;
+      const authContext = request.auth;
+
+      if (authContext && authContext.uid) {
+        const proStatus = authContext.token?.proStatus;
+        const member = authContext.token?.member;
+        console.log(`User ${authContext.uid} - checking member claim: '${member}' - checking proStatus claim: '${proStatus}'`);
+
+        if (member === true && (proStatus === "Monthly" || proStatus === "Lifetime")) {
+          isPremium = true;
+          console.log(`User ${authContext.uid} IS premium.`);
+        } else {
+          isPremium = false;
+          console.log(`User ${authContext.uid} is NOT premium.`);
+        }
+      } else {
+        console.log("No authenticated user detected in context.");
+        isPremium = false;
+      }
+
+      const chapter = parseInt(request.data?.chapter) || 1;
+      console.log(`Fetching flashcards for chapter: ${chapter} (Premium: ${isPremium})`);
+
+      let flashcardsQuery = db.collection("flashcards")
+          .where("chapter", "==", chapter);
+
+      if (!isPremium) {
+        console.log("Querying non-premium flashcards only.");
+        flashcardsQuery = flashcardsQuery.where("premium", "==", false).orderBy("cardNumber");
+      } else {
+        console.log("Querying all flashcards for premium user.");
+        flashcardsQuery = flashcardsQuery.orderBy("cardNumber");
+      }
+
+      const snapshot = await flashcardsQuery.get();
+
+      if (snapshot.empty) {
+        console.log(`No flashcards found for chapter ${chapter} matching criteria.`);
+        return {flashcards: []};
+      }
+
+      console.log(`Found ${snapshot.docs.length} flashcards.`);
+      const flashcards = snapshot.docs.map((doc) => {
+        const flashcardData = doc.data();
+        flashcardData.id = doc.id;
+        return flashcardData;
+      });
+
+      return {flashcards: flashcards};
+    },
+);
+
 export const importQuestionsFromRepo = onSchedule(
     {
       schedule: "0 0 * * *",
