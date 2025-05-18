@@ -195,7 +195,7 @@ export const importFlashCardsFromRepo = onSchedule(
           headers: {Authorization: `token ${token}`},
         });
         const data = await response.json();
-        
+
         if (!data.content) {
           console.error("No content found in the flashcards.js file from GitHub");
           return;
@@ -207,7 +207,7 @@ export const importFlashCardsFromRepo = onSchedule(
         // Compute a SHA-256 hash of the JSON string
         const newHash = crypto.createHash("sha256").update(jsonStr).digest("hex");
         const storedHash = metadata.hash || null;
-        
+
         if (storedHash === newHash) {
           console.log("No changes detected for flashcards; skipping update.");
           return;
@@ -229,23 +229,23 @@ export const importFlashCardsFromRepo = onSchedule(
         // Add new flashcards in batches (max 500 batch size)
         const batchSize = 400;
         let batchCount = 0;
-        
+
         for (let i = 0; i < flashcards.length; i += batchSize) {
           const batch = db.batch();
           const batchItems = flashcards.slice(i, i + batchSize);
-          
+
           batchItems.forEach((flashcard) => {
             const docRef = db.collection("flashcards").doc();
             batch.set(docRef, flashcard);
           });
-          
+
           await batch.commit();
           batchCount++;
           console.log(`Imported batch ${batchCount} (${batchItems.length} flashcards)`);
         }
 
         // Update the stored hash in metadata
-        await metadataRef.set({ hash: newHash });
+        await metadataRef.set({hash: newHash});
         console.log(`Flashcards imported successfully. Updated metadata hash.`);
       } catch (error) {
         console.error("Error importing flashcards:", error);
