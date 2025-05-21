@@ -5,7 +5,7 @@
       <v-card-text>
         <v-switch
           v-model="options.shuffled"
-          :label="`Randomly Order Questions: ${options.shuffled}`"
+          :label="`Randomly Order Questions and Flashcards: ${options.shuffled}`"
           color="primary"
           hide-details
         ></v-switch>

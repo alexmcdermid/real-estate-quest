@@ -4,7 +4,7 @@
       <v-col cols="12" class="d-flex flex-column flex-md-row align-items-center justify-space-around justify-md-space-between">
         <h2 class="mb-2 mb-md-0 text-center text-md-start mx-auto mx-md-0">Flashcards - Chapter {{ selectedChapter }}</h2>
         <div v-if="hasViewedFlashcards" class="d-flex align-items-center align-self-center w-100 w-md-auto justify-center justify-md-start">
-          <span class="flashcard-counter">Viewed: {{ viewedFlashcards.size }} / {{ flashcards.length }}</span>
+          <span class="flashcard-counter">Completed: {{ viewedFlashcards.size }} / {{ flashcards.length }}</span>
           <v-btn color="error" outlined @click="resetAllFlashcards">Reset All</v-btn>
         </div>
       </v-col>
@@ -53,7 +53,7 @@
       </v-col>
       <v-col cols="12" class="d-flex align-items-center justify-space-around justify-md-end">
         <div v-if="hasViewedFlashcards" class="d-flex align-items-center">
-          <span class="flashcard-counter">Viewed: {{ viewedFlashcards.size }} / {{ flashcards.length }}</span>
+          <span class="flashcard-counter">Completed: {{ viewedFlashcards.size }} / {{ flashcards.length }}</span>
           <v-btn color="error" outlined @click="resetAllFlashcards">Reset All</v-btn>
         </div>
       </v-col>

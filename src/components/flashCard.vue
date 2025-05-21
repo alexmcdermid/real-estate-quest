@@ -3,79 +3,23 @@
     <v-card 
       outlined 
       class="mb-4 flashcard" 
-      :class="{ 'flipped': isFlipped }"
-      @click="flipCard"
       :data-flashcard-index="flashcardIndex"
+      @click="flipCard"
     >
-      <div class="flashcard-inner">
+      <div class="flashcard-inner" :class="{ 'flipped': isFlipped }">
         <div class="flashcard-front">
-          <v-card-title v-if="!shuffled" class="text-center preformatted">
-            Card {{ flashcard.cardNumber }}
-          </v-card-title>
           <v-card-text>
             <div class="flashcard-content">
               <span class="flashcard-text" v-html="formattedFront"></span>
             </div>
           </v-card-text>
-          <v-card-actions class="d-flex justify-center">
-            <v-btn
-              color="primary"
-              variant="outlined"
-              @click.stop="flipCard"
-              class="mt-2"
-            >
-              Reveal Answer
-            </v-btn>
-          </v-card-actions>
         </div>
         <div class="flashcard-back">
-          <v-card-title v-if="!shuffled" class="text-center preformatted">
-            Card {{ flashcard.cardNumber }}
-          </v-card-title>
           <v-card-text>
             <div class="flashcard-content">
               <span class="flashcard-text" v-html="formattedBack"></span>
             </div>
           </v-card-text>
-          <v-card-actions class="d-flex justify-space-between">
-            <v-btn
-              color="primary"
-              variant="outlined"
-              @click.stop="flipCard"
-              class="mt-2"
-            >
-              Show Question
-            </v-btn>
-            <div class="d-flex">
-              <v-btn
-                icon
-                color="error"
-                variant="text"
-                @click.stop="markDifficulty(1)"
-                :class="{ 'difficulty-selected': markedDifficulty === 1 }"
-              >
-                <v-icon>mdi-emoticon-sad-outline</v-icon>
-              </v-btn>
-              <v-btn
-                icon
-                color="warning"
-                variant="text"
-                @click.stop="markDifficulty(2)"
-                :class="{ 'difficulty-selected': markedDifficulty === 2 }"
-              >
-                <v-icon>mdi-emoticon-neutral-outline</v-icon>
-              </v-btn>
-              <v-btn
-                icon
-                color="success"
-                variant="text"
-                @click.stop="markDifficulty(3)"
-                :class="{ 'difficulty-selected': markedDifficulty === 3 }"
-              >
-                <v-icon>mdi-emoticon-happy-outline</v-icon>
-              </v-btn>
-            </div>
-          </v-card-actions>
         </div>
       </div>
     </v-card>
@@ -83,7 +27,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 
 const props = defineProps({
   flashcard: {
@@ -111,6 +55,17 @@ const emit = defineEmits(["flashcardViewed", "flashcardDifficulty"]);
 const isFlipped = ref(false);
 const markedDifficulty = ref(null);
 
+// Watch for resetAll prop to reset the card to front side
+watch(() => props.resetAll, (newVal) => {
+  if (newVal) {
+    if (isFlipped.value) {
+      emit('flashcardViewed', { index: props.flashcardIndex, viewed: false });
+    }
+    isFlipped.value = false;
+    markedDifficulty.value = null;
+  }
+});
+
 // Format content with line breaks and bold text
 const formattedFront = computed(() => {
   return props.flashcard.front
@@ -127,9 +82,7 @@ const formattedBack = computed(() => {
 // Flip the card
 function flipCard() {
   isFlipped.value = !isFlipped.value;
-  if (isFlipped.value) {
-    emit("flashcardViewed", props.flashcardIndex);
-  }
+  emit('flashcardViewed', { index: props.flashcardIndex, viewed: isFlipped.value });
 }
 
 // Mark the difficulty level
@@ -146,22 +99,21 @@ function markDifficulty(level) {
 }
 
 .flashcard {
-  transition: transform 0.6s;
-  transform-style: preserve-3d;
-  position: relative;
   min-height: 200px;
   cursor: pointer;
 }
 
-.flashcard.flipped {
-  transform: rotateY(180deg);
-}
-
 .flashcard-inner {
+  transition: transform 0.6s;
+  transform-style: preserve-3d;
   position: relative;
   width: 100%;
   height: 100%;
   text-align: center;
+}
+
+.flashcard-inner.flipped {
+  transform: rotateY(180deg);
 }
 
 .flashcard-front, .flashcard-back {
@@ -175,8 +127,13 @@ function markDifficulty(level) {
   flex-direction: column;
 }
 
+.flashcard-front {
+  z-index: 2;
+}
+
 .flashcard-back {
   transform: rotateY(180deg);
+  z-index: 1;
 }
 
 .flashcard-content {
@@ -186,10 +143,18 @@ function markDifficulty(level) {
   justify-content: center;
   align-items: center;
   padding: 16px;
+  min-height: 180px;
+  max-height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .flashcard-text {
   font-size: 18px;
+  width: 100%;
+  word-break: break-word;
+  text-align: center;
 }
 
 .preformatted {
