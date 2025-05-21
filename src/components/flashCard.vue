@@ -142,7 +142,6 @@ function markDifficulty(level) {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: 16px;
   min-height: 180px;
   max-height: 100%;
   overflow-y: auto;
@@ -155,6 +154,18 @@ function markDifficulty(level) {
   width: 100%;
   word-break: break-word;
   text-align: center;
+}
+
+@media (max-width: 960px) {
+  .flashcard-text {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 600px) {
+  .flashcard-text {
+    font-size: 14px;
+  }
 }
 
 .preformatted {
