@@ -53,6 +53,7 @@
               <component
                 :is="item.component"
                 v-bind="item.props"
+                proType="questions"
                 @questionCompleted="markQuestionCompleted(index)"
                 @questionReset="markQuestionReset(index)"
               />

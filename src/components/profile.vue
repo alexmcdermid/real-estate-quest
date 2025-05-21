@@ -72,7 +72,7 @@
           <v-card-title>Upgrade to Pro</v-card-title>
           <v-card-text>
             <p class="pb-1">Pass your BC Real Estate Licensing Exam on the first try with confidence!</p>
-            <p>Get access today and unlock 800+ high-quality practice questions. Look forward to upcoming flashcards and new questions to keep you one step ahead.</p>
+            <p>Get access today and unlock 1000+ high-quality practice questions and flashcards. Stay one step ahead with thorough, exam-focused study materials.</p>
             <v-row class="mt-4">
               <v-col cols="12" md="6">
                 <v-hover>

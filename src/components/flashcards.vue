@@ -25,8 +25,8 @@
       <v-col cols="12">
         <v-row>
           <template v-if="isLoading">
-            <v-col v-for="n in 4" :key="n" cols="12" md="6">
-              <v-skeleton-loader type="card, article, actions" elevation="11" />
+            <v-col v-for="n in 8" :key="n" cols="12" md="6">
+              <v-skeleton-loader type="card" elevation="11" />
             </v-col>
           </template>
           <template v-else>
@@ -34,6 +34,7 @@
               <component
                 :is="item.component"
                 v-bind="item.props"
+                proType="flashcards"
                 @flashcardViewed="markFlashcardViewed(index)"
                 @flashcardDifficulty="markFlashcardDifficulty"
               />
