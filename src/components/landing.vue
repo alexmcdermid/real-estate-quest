@@ -5,7 +5,7 @@
       <v-col cols="12" md="9" class="text-center">
         <h1 class="hero-title">Pass Your BC Real Estate Licensing Exam on the First Try!</h1>
         <p class="hero-subtitle">
-          Boost your exam readiness with 800+ curated practice questions for the British Columbia real estate licensing course exam. Stay sharp, study smarter, and give yourself the best shot at success.
+          Boost your exam readiness with 1000+ curated practice questions and flashcards for the British Columbia real estate licensing course exam. Stay sharp, study smarter, and give yourself the best shot at success.
         </p>
         <v-btn color="primary" large class="cta-btn" @click="navigateToQuestions">
           Try Questions for Free
@@ -64,7 +64,7 @@
         <v-card outlined class="why-card">
           <v-card-title>Complete Study Resources</v-card-title>
           <v-card-text>
-            Start with our comprehensive BC real estate exam prep questions, flashcards and expanded study tools are coming soon to support deeper learning.
+            Start with our comprehensive BC real estate exam prep questions and flashcards. More study tools are coming soon to support deeper learning.
           </v-card-text>
         </v-card>
       </v-col>
