@@ -58,6 +58,16 @@
                 @questionReset="markQuestionReset(index)"
               />
             </v-col>
+            <template v-if="!isPro">
+              <v-col
+                v-for="n in ((questions.length + 1) % 2 === 0 ? 2 : 3)"
+                :key="'blurred-cta-' + n"
+                cols="12"
+                md="6"
+              >
+                <BlurredCtaCard proType="questions" :overallNumber="questions[questions.length - 1]?.questionNumber" :blurIndex="n - 1" />
+              </v-col>
+            </template>
             <v-col 
             v-if="questions.length == 0"
             cols="12"
@@ -100,6 +110,7 @@ import { useRoute, useRouter } from "vue-router";
 import { fetchQuestionsByChapter } from "../composables/useQuestion";
 import QuestionCard from "./questionCard.vue";
 import ProCard from "./proCard.vue";
+import BlurredCtaCard from "./BlurredCtaCard.vue";
 import useOptions from "../composables/useOption";
 import { chapters } from "@/constants/chapters";
 
@@ -123,7 +134,7 @@ const questionsWithProCard = computed(() => {
     component: QuestionCard,
     props: {
       question: q,
-      shuffled: shuffled.value,
+      shuffled: !!shuffled.value,
       questionIndex: index,
       resetAll: resetAll.value,
     },

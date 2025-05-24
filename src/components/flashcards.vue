@@ -39,6 +39,16 @@
                 @flashcardDifficulty="markFlashcardDifficulty"
               />
             </v-col>
+            <template v-if="!isPro">
+              <v-col
+                v-for="n in (flashcards.length % 2 === 0 ? 1 : 2)"
+                :key="'blurred-cta-' + n"
+                cols="12"
+                md="6"
+              >
+                <BlurredCtaCard proType="flashcards" :overallNumber="flashcards.length" :blurIndex="n - 1" />
+              </v-col>
+            </template>
             <v-col v-if="flashcards.length == 0" cols="12" md="6">
               <v-card>
                 <v-card-title class="preformatted text-center">
@@ -70,6 +80,7 @@ import { useRoute, useRouter } from "vue-router";
 import { fetchFlashcardsByChapter } from "../composables/useFlashcard";
 import FlashCard from "./flashCard.vue";
 import ProCard from "./proCard.vue";
+import BlurredCtaCard from "./BlurredCtaCard.vue";
 import useOptions from "../composables/useOption";
 import { chapters } from "@/constants/chapters";
 
@@ -93,7 +104,7 @@ const flashcardsWithProCard = computed(() => {
     component: FlashCard,
     props: {
       flashcard: f,
-      shuffled: shuffled.value,
+      shuffled: !!shuffled.value,
       flashcardIndex: index,
       resetAll: resetAll.value,
     },
@@ -177,24 +188,25 @@ function shuffleArray(array) {
   while (currentIndex !== 0) {
     randomIndex = Math.floor(Math.random() * currentIndex);
     currentIndex--;
-    [array[currentIndex], array[randomIndex]] = [
-      array[randomIndex],
-      array[currentIndex],
-    ];
+    [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
   }
   return array;
 }
 </script>
 
 <style scoped>
-.preformatted {
-  white-space: pre-wrap;
-  word-break: break-word;
-}
 .flashcard-counter {
   font-weight: 500;
-  margin-right: 8px;
-  display: flex;
-  align-items: center;
+  margin-right: 16px;
+}
+
+.v-select {
+  min-width: 300px;
+}
+
+@media (max-width: 600px) {
+  .v-select {
+    min-width: 100%;
+  }
 }
 </style>
