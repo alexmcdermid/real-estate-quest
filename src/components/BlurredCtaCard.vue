@@ -48,7 +48,10 @@
     </template>
     <template v-else>
       <div class="flashcard-content" :style="blurStyle">
-        <span class="flashcard-text">
+        <span v-if="blurIndex === 1" class="flashcard-text">
+          The process of estimating the value of a property based on market data and analysis.
+        </span>
+        <span v-else class="flashcard-text">
           The specific property that is the focus of an appraisal or valuation assignment.
         </span>
       </div>
