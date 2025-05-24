@@ -6,8 +6,19 @@
     </v-btn>
 
     <!-- Centered Questions Button -->
-    <v-btn text class="nav-link" @click="navigateTo('/questions')">
+    <v-btn text class="nav-link d-none d-md-flex" @click="navigateTo('/questions')">
       <span>Questions</span>
+    </v-btn>
+    <v-btn icon class="nav-link d-flex d-md-none" @click="navigateTo('/questions')" aria-label="Questions">
+      <v-icon>mdi-clipboard-text-outline</v-icon>
+    </v-btn>
+
+    <!-- Centered Flashcards Button -->
+    <v-btn text class="nav-link d-none d-md-flex" @click="navigateTo('/flashcards')">
+      <span>Flashcards</span>
+    </v-btn>
+    <v-btn icon class="nav-link d-flex d-md-none" @click="navigateTo('/flashcards')" aria-label="Flashcards">
+      <v-icon>mdi-cards-outline</v-icon>
     </v-btn>
 
     <v-spacer />

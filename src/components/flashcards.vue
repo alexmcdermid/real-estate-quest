@@ -2,16 +2,10 @@
   <v-container>
     <v-row>
       <v-col cols="12" class="d-flex flex-column flex-md-row align-items-center justify-space-around justify-md-space-between">
-        <h2 class="mb-2 mb-md-0 text-center text-md-start mx-auto mx-md-0">Quiz Questions - Chapter {{ selectedChapter }}</h2>
-        <div v-if="hasCompletedQuestions" class="d-flex align-items-center align-self-center w-100 w-md-auto justify-center justify-md-start">
-          <span class="question-counter">Answered: {{ completedQuestions.size }} / {{ questions.length }}</span>
-          <v-btn
-            color="error"
-            outlined
-            @click="resetAllQuestions"
-          >
-            Reset All
-          </v-btn>
+        <h2 class="mb-2 mb-md-0 text-center text-md-start mx-auto mx-md-0">Flashcards - Chapter {{ selectedChapter }}</h2>
+        <div v-if="hasViewedFlashcards" class="d-flex align-items-center align-self-center w-100 w-md-auto justify-center justify-md-start">
+          <span class="flashcard-counter">Completed: {{ viewedFlashcards.size }} / {{ flashcards.length }}</span>
+          <v-btn color="error" outlined @click="resetAllFlashcards">Reset All</v-btn>
         </div>
       </v-col>
       <v-col cols="12">
@@ -31,51 +25,34 @@
       <v-col cols="12">
         <v-row>
           <template v-if="isLoading">
-            <v-col
-              v-for="n in 4"
-              :key="n"
-              cols="12"
-              md="6"
-            >
-              <v-skeleton-loader
-                type="card, article, actions"
-                elevation="11"
-              />
+            <v-col v-for="n in 8" :key="n" cols="12" md="6">
+              <v-skeleton-loader type="card" elevation="11" />
             </v-col>
           </template>
           <template v-else>
-            <v-col
-              v-for="(item, index) in questionsWithProCard"
-              :key="index"
-              cols="12"
-              md="6"
-            >
+            <v-col v-for="(item, index) in flashcardsWithProCard" :key="index" cols="12" md="6">
               <component
                 :is="item.component"
                 v-bind="item.props"
-                proType="questions"
-                @questionCompleted="markQuestionCompleted(index)"
-                @questionReset="markQuestionReset(index)"
+                proType="flashcards"
+                @flashcardViewed="markFlashcardViewed(index)"
+                @flashcardDifficulty="markFlashcardDifficulty"
               />
             </v-col>
             <template v-if="!isPro">
               <v-col
-                v-for="n in (questions.length % 2 === 0 ? 1 : 2)"
+                v-for="n in (flashcards.length % 2 === 0 ? 1 : 2)"
                 :key="'blurred-cta-' + n"
                 cols="12"
                 md="6"
               >
-                <BlurredCtaCard proType="questions" :overallNumber="questions[questions.length - 1]?.questionNumber" :blurIndex="n - 1" />
+                <BlurredCtaCard proType="flashcards" :overallNumber="flashcards.length" :blurIndex="n - 1" />
               </v-col>
             </template>
-            <v-col 
-            v-if="questions.length == 0"
-            cols="12"
-            md="6"
-            >
+            <v-col v-if="flashcards.length == 0" cols="12" md="6">
               <v-card>
                 <v-card-title class="preformatted text-center">
-                  No questions available for this chapter.
+                  No flashcards available for this chapter.
                 </v-card-title>
                 <v-card-text class="text-center">
                   Content coming soon, please check back later.
@@ -86,15 +63,9 @@
         </v-row>
       </v-col>
       <v-col cols="12" class="d-flex align-items-center justify-space-around justify-md-end">
-        <div v-if="hasCompletedQuestions" class="d-flex align-items-center">
-          <span class="question-counter">Answered: {{ completedQuestions.size }} / {{ questions.length }}</span>
-          <v-btn
-            color="error"
-            outlined
-            @click="resetAllQuestions"
-          >
-            Reset All
-          </v-btn>
+        <div v-if="hasViewedFlashcards" class="d-flex align-items-center">
+          <span class="flashcard-counter">Completed: {{ viewedFlashcards.size }} / {{ flashcards.length }}</span>
+          <v-btn color="error" outlined @click="resetAllFlashcards">Reset All</v-btn>
         </div>
       </v-col>
     </v-row>
@@ -106,9 +77,8 @@ import { ref, watch, onMounted, computed } from "vue";
 import { useAuthStore } from "../composables/useAuth";
 import { storeToRefs } from "pinia";
 import { useRoute, useRouter } from "vue-router";
-
-import { fetchQuestionsByChapter } from "../composables/useQuestion";
-import QuestionCard from "./questionCard.vue";
+import { fetchFlashcardsByChapter } from "../composables/useFlashcard";
+import FlashCard from "./flashCard.vue";
 import ProCard from "./proCard.vue";
 import BlurredCtaCard from "./BlurredCtaCard.vue";
 import useOptions from "../composables/useOption";
@@ -116,78 +86,79 @@ import { chapters } from "@/constants/chapters";
 
 const authStore = useAuthStore();
 const { authInitialized, isPro } = storeToRefs(authStore);
-
 const { options } = useOptions();
 
 const isLoading = ref(true);
 const selectedChapter = ref(1);
-const questions = ref([]);
-const completedQuestions = ref(new Set());
+const flashcards = ref([]);
+const viewedFlashcards = ref(new Set());
 const shuffled = computed(() => options.shuffled);
 const resetAll = ref(false);
+const flashcardDifficulties = ref({});
 
 const route = useRoute();
 const router = useRouter();
 
-const questionsWithProCard = computed(() => {
-  const questionItems = questions.value.map((q, index) => ({
-    component: QuestionCard,
+const flashcardsWithProCard = computed(() => {
+  const cardItems = flashcards.value.map((f, index) => ({
+    component: FlashCard,
     props: {
-      question: q,
+      flashcard: f,
       shuffled: !!shuffled.value,
-      questionIndex: index,
+      flashcardIndex: index,
       resetAll: resetAll.value,
     },
   }));
-
   if (!isPro.value) {
-    const middleIndex = Math.floor(questionItems.length / 2);
-    questionItems.splice(middleIndex, 0, {
+    const middleIndex = Math.floor(cardItems.length / 2);
+    cardItems.splice(middleIndex, 0, {
       component: ProCard,
       props: {},
     });
   }
-
-  return questionItems;
+  return cardItems;
 });
 
-const hasCompletedQuestions = computed(() => completedQuestions.value.size > 0);
+const hasViewedFlashcards = computed(() => viewedFlashcards.value.size > 0);
 
-function markQuestionCompleted(index) {
-  completedQuestions.value.add(index);
+function markFlashcardViewed(index) {
+  viewedFlashcards.value.add(index);
 }
 
-function markQuestionReset(index) {
-  completedQuestions.value.delete(index);
+function markFlashcardDifficulty({ index, difficulty }) {
+  flashcardDifficulties.value[index] = difficulty;
 }
 
-function resetAllQuestions() {
+function resetAllFlashcards() {
   resetAll.value = true;
   setTimeout(() => {
     resetAll.value = false;
+    viewedFlashcards.value.clear();
+    flashcardDifficulties.value = {};
   }, 0);
 }
 
-async function loadQuestions() {
+async function loadFlashcards() {
   try {
-    const result = await fetchQuestionsByChapter(selectedChapter.value);
-    questions.value = shuffled.value ? shuffleArray([...result]) : result;
+    const result = await fetchFlashcardsByChapter(selectedChapter.value);
+    flashcards.value = shuffled.value ? shuffleArray([...result]) : result;
     isLoading.value = false;
   } catch (error) {
     isLoading.value = false;
-    console.error("Error loading questions:", error);
+    console.error("Error loading flashcards:", error);
   }
 }
 
 watch(selectedChapter, () => {
   isLoading.value = true;
-  completedQuestions.value = new Set();
-  loadQuestions();
+  viewedFlashcards.value = new Set();
+  flashcardDifficulties.value = {};
+  loadFlashcards();
 });
 
 watch(shuffled, () => {
   isLoading.value = true;
-  loadQuestions();
+  loadFlashcards();
 });
 
 onMounted(() => {
@@ -200,11 +171,11 @@ onMounted(() => {
     router.replace({ query: { ...rest } });
   }
   if (authInitialized.value) {
-    loadQuestions();
+    loadFlashcards();
   } else {
     const stopWatch = watch(authInitialized, (newVal) => {
       if (newVal === true) {
-        loadQuestions();
+        loadFlashcards();
         stopWatch();
       }
     });
@@ -214,30 +185,28 @@ onMounted(() => {
 function shuffleArray(array) {
   let currentIndex = array.length,
     randomIndex;
-
   while (currentIndex !== 0) {
     randomIndex = Math.floor(Math.random() * currentIndex);
     currentIndex--;
-
-    [array[currentIndex], array[randomIndex]] = [
-      array[randomIndex],
-      array[currentIndex],
-    ];
+    [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
   }
-
   return array;
 }
 </script>
 
 <style scoped>
-.preformatted {
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-.question-counter {
+.flashcard-counter {
   font-weight: 500;
-  margin-right: 8px;
-  display: flex;
-  align-items: center;
+  margin-right: 16px;
+}
+
+.v-select {
+  min-width: 300px;
+}
+
+@media (max-width: 600px) {
+  .v-select {
+    min-width: 100%;
+  }
 }
 </style>
