@@ -133,7 +133,7 @@ function resetAllFlashcards() {
   resetAll.value = true;
   setTimeout(() => {
     resetAll.value = false;
-    viewedFlashcards.value = new Set();
+    viewedFlashcards.value.clear();
     flashcardDifficulties.value = {};
   }, 0);
 }
