@@ -60,7 +60,7 @@
             </v-col>
             <template v-if="!isPro">
               <v-col
-                v-for="n in ((questions.length + 1) % 2 === 0 ? 2 : 3)"
+                v-for="n in (questions.length % 2 === 0 ? 1 : 2)"
                 :key="'blurred-cta-' + n"
                 cols="12"
                 md="6"
