@@ -32,6 +32,14 @@
               <v-radio label="4. To manage strata corporations" value="3" />
             </template>
           </v-radio-group>
+          <v-btn
+            color="primary"
+            :disabled="true"
+            class="mt-4"
+            block
+          >
+            Submit Answer
+          </v-btn>
         </v-card-text>
       </v-card>
       <div class="blur-overlay">
