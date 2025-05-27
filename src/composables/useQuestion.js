@@ -1,6 +1,7 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp } from "../config/firebaseConfig";
 import { CACHE_KEY, STALE_TIME } from "../config/constants"
+import { showRateLimitBanner } from './useRateLimitBanner';
  
 /**
  * Encodes a Unicode string to Base64.
@@ -62,6 +63,14 @@ export async function fetchQuestionsByChapter(chapter = 1) {
     localStorage.setItem(CACHE_KEY, encodeCache(cache));
     return result.data.questions;
   } catch (error) {
+    if (
+      error?.code === 'resource-exhausted' ||
+      error?.message?.includes('Too many requests') ||
+      error?.status === 'RESOURCE_EXHAUSTED'
+    ) {
+      showRateLimitBanner();
+      return [];
+    }
     console.error("Error fetching questions:", error);
     return error;
   }

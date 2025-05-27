@@ -1,13 +1,24 @@
 import {onDocumentUpdated} from "firebase-functions/v2/firestore";
-import {onCall, onRequest} from "firebase-functions/v2/https";
+import {onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import {defineSecret} from "firebase-functions/params";
 import admin from "firebase-admin";
 import crypto from "crypto";
-import Stripe from "stripe"; // Import Stripe
+import Stripe from "stripe";
+import {FirebaseFunctionsRateLimiter} from "firebase-functions-rate-limiter";
 
 admin.initializeApp();
 const db = admin.firestore();
+
+const unauthLimiter = FirebaseFunctionsRateLimiter.withFirestoreBackend(
+    {name: "unauth_rate_limiter", maxCalls: 40, periodSeconds: 60},
+    db,
+);
+
+const authLimiter = FirebaseFunctionsRateLimiter.withFirestoreBackend(
+    {name: "user_rate_limiter", maxCalls: 40, periodSeconds: 60},
+    db,
+);
 
 const stripeSecretKeyDev = defineSecret("STRIPE_SECRET_KEY_DEV");
 const stripeWebhookSecretDev = defineSecret("STRIPE_WEBHOOK_SECRET_DEV");
@@ -51,6 +62,17 @@ export const getQuestionsByChapter = onCall(
     },
 
     async (request) => {
+      const qualifier = request.auth?.uid? `u_${request.auth.uid}`: request.rawRequest.ip;
+      const limiter = request.auth?.uid ? authLimiter : unauthLimiter;
+      try {
+        await limiter.rejectOnQuotaExceededOrRecordUsage(qualifier);
+      } catch (err) {
+        throw new HttpsError(
+            "resource-exhausted",
+            "Too many requests – please try again in a minute.",
+        );
+      }
+
       console.log("is prod", isProduction);
       let isPremium = false;
       const authContext = request.auth;
@@ -111,6 +133,17 @@ export const getFlashCardsByChapter = onCall(
     },
 
     async (request) => {
+      const qualifier = request.auth?.uid? `u_${request.auth.uid}`: request.rawRequest.ip;
+      const limiter = request.auth?.uid ? authLimiter : unauthLimiter;
+      try {
+        await limiter.rejectOnQuotaExceededOrRecordUsage(qualifier);
+      } catch (err) {
+        throw new HttpsError(
+            "resource-exhausted",
+            "Too many requests – please try again in a minute.",
+        );
+      }
+
       console.log("is prod", isProduction);
       let isPremium = false;
       const authContext = request.auth;

@@ -58,7 +58,7 @@
                 @questionReset="markQuestionReset(index)"
               />
             </v-col>
-            <template v-if="!isPro">
+            <template v-if="!isPro && questions.length > 0">
               <v-col
                 v-for="n in (questions.length % 2 === 0 ? 1 : 2)"
                 :key="'blurred-cta-' + n"
@@ -140,7 +140,7 @@ const questionsWithProCard = computed(() => {
     },
   }));
 
-  if (!isPro.value) {
+  if (!isPro.value && questionItems.length > 0) {
     const middleIndex = Math.floor(questionItems.length / 2);
     questionItems.splice(middleIndex, 0, {
       component: ProCard,

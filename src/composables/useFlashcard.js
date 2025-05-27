@@ -2,6 +2,7 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp } from "../config/firebaseConfig";
 import { CACHE_KEY, STALE_TIME } from "../config/constants";
 import { encodeCache, decodeCache } from "./useQuestion";
+import { showRateLimitBanner } from './useRateLimitBanner';
 
 /**
  * Fetches flashcards for a specific chapter
@@ -37,6 +38,14 @@ export async function fetchFlashcardsByChapter(chapter = 1) {
     localStorage.setItem(CACHE_KEY, encodeCache(cache));
     return result.data.flashcards;
   } catch (error) {
+    if (
+      error?.code === 'resource-exhausted' ||
+      error?.message?.includes('Too many requests') ||
+      error?.status === 'RESOURCE_EXHAUSTED'
+    ) {
+      showRateLimitBanner();
+      return [];
+    }
     console.error("Error fetching flashcards:", error);
     throw error;
   }
