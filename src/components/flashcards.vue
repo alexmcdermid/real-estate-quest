@@ -39,7 +39,7 @@
                 @flashcardDifficulty="markFlashcardDifficulty"
               />
             </v-col>
-            <template v-if="!isPro">
+            <template v-if="!isPro && flashcards.length > 0">
               <v-col
                 v-for="n in (flashcards.length % 2 === 0 ? 1 : 2)"
                 :key="'blurred-cta-' + n"
@@ -109,7 +109,7 @@ const flashcardsWithProCard = computed(() => {
       resetAll: resetAll.value,
     },
   }));
-  if (!isPro.value) {
+  if (!isPro.value && cardItems.length > 0) {
     const middleIndex = Math.floor(cardItems.length / 2);
     cardItems.splice(middleIndex, 0, {
       component: ProCard,
