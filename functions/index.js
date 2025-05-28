@@ -67,6 +67,18 @@ export const getQuestionsByChapter = onCall(
       try {
         await limiter.rejectOnQuotaExceededOrRecordUsage(qualifier);
       } catch (err) {
+        try {
+          await db.collection("rate_limit_logs").add({
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            type: "questions",
+            qualifier,
+            uid: request.auth?.uid || null,
+            ip: request.rawRequest.ip || null,
+            userAgent: request.rawRequest.headers["user-agent"] || null,
+          });
+        } catch (logErr) {
+          console.error("Failed to log rate limit event (questions):", logErr);
+        }
         throw new HttpsError(
             "resource-exhausted",
             "Too many requests – please try again in a minute.",
@@ -131,13 +143,24 @@ export const getFlashCardsByChapter = onCall(
       region: "us-west1",
       enforceAppCheck: true,
     },
-
     async (request) => {
       const qualifier = request.auth?.uid? `u_${request.auth.uid}`: request.rawRequest.ip;
       const limiter = request.auth?.uid ? authLimiter : unauthLimiter;
       try {
         await limiter.rejectOnQuotaExceededOrRecordUsage(qualifier);
       } catch (err) {
+        try {
+          await db.collection("rate_limit_logs").add({
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            type: "flashcards",
+            qualifier,
+            uid: request.auth?.uid || null,
+            ip: request.rawRequest.ip || null,
+            userAgent: request.rawRequest.headers["user-agent"] || null,
+          });
+        } catch (logErr) {
+          console.error("Failed to log rate limit event (flashcards):", logErr);
+        }
         throw new HttpsError(
             "resource-exhausted",
             "Too many requests – please try again in a minute.",
