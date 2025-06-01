@@ -4,6 +4,7 @@
       outlined 
       class="mb-4 flashcard" 
       :data-flashcard-index="flashcardIndex"
+      :ripple="false"
       @click="flipCard"
     >
       <div class="flashcard-inner" :class="{ 'flipped': isFlipped }">
