@@ -7,11 +7,8 @@
         <p class="hero-subtitle">
           Boost your exam readiness with 1000+ curated practice questions and flashcards for the British Columbia real estate licensing course exam. Stay sharp, study smarter, and give yourself the best shot at success.
         </p>
-        <v-btn color="primary" large class="cta-btn" @click="navigateToQuestions">
+        <v-btn color="primary" size="large" class="cta-btn" @click="navigateToQuestions">
           Try Questions for Free
-        </v-btn>
-        <v-btn color="secondary" large class="cta-btn" @click="navigateToPro">
-          Upgrade to Pro
         </v-btn>
       </v-col>
     </v-row>
@@ -85,10 +82,10 @@
         <p>
           Ready to get serious about passing your British Columbia real estate licensing exam? Try our practice questions for free, or unlock full access to our complete set of questions.
         </p>
-        <v-btn color="primary" large class="cta-btn" @click="navigateToQuestions">
+        <v-btn color="primary" class="cta-btn" @click="navigateToQuestions">
           Try Questions for Free
         </v-btn>
-        <v-btn color="secondary" large class="cta-btn" @click="navigateToPro">
+        <v-btn color="secondary" class="cta-btn" @click="navigateToPro">
           Upgrade to Pro
         </v-btn>
       </v-col>
