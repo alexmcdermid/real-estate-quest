@@ -65,6 +65,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useRouter } from "vue-router";
+
 const router = useRouter();
 const props = defineProps({
   proType: {
@@ -103,7 +104,6 @@ const blurStyle = computed(() => {
   align-items: stretch;
   cursor: pointer;
   overflow: hidden;
-  background: #f5f5f5;
   box-sizing: border-box;
 }
 .question-card-mimic {
@@ -132,14 +132,14 @@ const blurStyle = computed(() => {
   align-items: center;
   justify-content: center;
   z-index: 2;
-  background: rgba(255,255,255,0.5);
+  background: rgba(var(--v-theme-surface), 0.7);
   pointer-events: none;
   padding: 24px 20px 24px 20px;
 }
 .blurred-cta-text {
   font-size: 1.1rem;
   font-weight: bold;
-  color: #1976D2;
+  color: rgb(var(--v-theme-primary));
   text-align: center;
   width: 100%;
   padding: 0;
