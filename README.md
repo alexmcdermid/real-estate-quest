@@ -4,13 +4,14 @@ Real Estate Quest is a web application designed to help users prepare for the Br
 
 ## Tech Stack
 - **Vue.js**: Frontend framework for building a responsive and interactive user interface.
+- **Vuetify**: Material Design component framework for Vue.js, providing the UI components and theming.
 - **Firebase Authentication**: Handles user sign-up, login, and authentication flows.
 - **Firebase Functions**: Serverless backend for handling business logic, such as user management and payment processing.
 - **Stripe**: Integrated for secure payment processing and subscription management.
 
 ## Key Features
 - **User Authentication**: Users can register and log in using Firebase Auth, supporting passwordless login methods (Google OAuth and email link sign-in).
-- **Exam Preparation**: Access to a curated set of practice questions for the BC real estate exam.
+- **Exam Preparation**: Access to a curated set of practice questions and flashcards for the BC real estate exam across 20 chapters.
 - **Membership & Payments**: Paid membership is managed via Stripe Checkout. Users can upgrade to access premium content.
 - **Serverless Backend**: Firebase Functions handle sensitive operations, such as verifying payments and managing user data securely.
 
@@ -25,7 +26,9 @@ Real Estate Quest is a web application designed to help users prepare for the Br
 The backend logic is implemented using Firebase Cloud Functions. Here are the main functions and their roles:
 
 - **getQuestionsByChapter**: Callable function that returns a list of questions for a given chapter. It checks the user's membership status to determine if premium questions should be included.
+- **getFlashCardsByChapter**: Callable function that returns a list of flashcards for a given chapter. Like questions, it checks membership status to determine if premium flashcards should be included.
 - **importQuestionsFromRepo**: Scheduled function that imports and updates question data from a GitHub repository into Firestore, ensuring the latest content is available.
+- **importFlashCardsFromRepo**: Scheduled function that imports and updates flashcard data from a GitHub repository into Firestore, running daily after the questions import.
 - **expireCanceledMemberships**: Scheduled function that checks for memberships scheduled to expire and updates user status and claims accordingly.
 - **createCheckoutSession**: Callable function that creates a Stripe Checkout session for either a monthly subscription or a lifetime membership, returning a secure payment URL.
 - **handleStripeWebhook**: HTTP function that processes Stripe webhook events (e.g., payment completed, subscription updated) to update user membership status and custom claims in Firebase Auth and Firestore.
@@ -39,8 +42,8 @@ These functions work together to provide secure authentication, membership manag
 The frontend is built with Vue.js and organized for clarity and scalability:
 
 - **src/components/**: Contains reusable UI components such as `loginModal.vue`, `profile.vue`, `questionCard.vue`, and more.
-- **src/composables/**: Houses composable logic for authentication (`useAuth.js`), membership (`useMembership.js`), questions (`useQuestion.js`), and UI state.
-- **src/models/**: Defines data models like `Members.js` and `Question.js` for type safety and consistency.
+- **src/composables/**: Houses composable logic for authentication (`useAuth.js`), membership (`useMembership.js`), questions (`useQuestion.js`), flashcards (`useFlashcard.js`), and UI state.
+- **src/models/**: Defines data models like `Members.js`, `Question.js`, and `FlashCard.js` for type safety and consistency.
 - **src/config/**: Includes Firebase configuration and app constants.
 - **src/constants/**: Stores static data such as chapter lists.
 - **src/router.js**: Manages client-side routing.
@@ -58,6 +61,7 @@ The frontend is built with Vue.js and organized for clarity and scalability:
 ## Database Structure
 
 - **questions**: Stores all exam questions, each with fields like `chapter`, `questionNumber`, `premium`, and the question content.
+- **flashcards**: Stores all flashcards, each with fields like `chapter`, `cardNumber`, `premium`, `front`, `back`, and optional tags.
 - **members**: Stores user membership data, including `member` status, `subscriptionType`, `customerId`, and `cancelAt`.
 - **metadata**: Used for tracking import hashes and other system-level data.
 
