@@ -5,20 +5,69 @@ import {defineSecret} from "firebase-functions/params";
 import admin from "firebase-admin";
 import crypto from "crypto";
 import Stripe from "stripe";
-import {FirebaseFunctionsRateLimiter} from "firebase-functions-rate-limiter";
+/**
+ * Custom rate limiter implementation using Firestore
+ */
+class SimpleRateLimiter {
+  /**
+   * Creates a new SimpleRateLimiter instance
+   * @param {string} name - The name of the rate limiter
+   * @param {number} maxCalls - Maximum calls allowed in the period
+   * @param {number} periodSeconds - Time period in seconds
+   * @param {object} db - Firestore database instance
+   */
+  constructor(name, maxCalls, periodSeconds, db) {
+    this.name = name;
+    this.maxCalls = maxCalls;
+    this.periodSeconds = periodSeconds;
+    this.db = db;
+  }
+
+  /**
+   * Checks rate limit and records usage
+   * @param {string} qualifier - Unique identifier for rate limiting
+   * @return {Promise} Promise that rejects if rate limit exceeded
+   */
+  async rejectOnQuotaExceededOrRecordUsage(qualifier) {
+    const now = admin.firestore.Timestamp.now();
+    const periodStart = admin.firestore.Timestamp.fromMillis(
+        now.toMillis() - (this.periodSeconds * 1000),
+    );
+
+    const docRef = this.db.collection("rate_limits").doc(`${this.name}_${qualifier}`);
+
+    return this.db.runTransaction(async (transaction) => {
+      const doc = await transaction.get(docRef);
+      const data = doc.exists ? doc.data() : {calls: [], lastReset: now};
+
+      // Remove old calls outside the time window
+      const recentCalls = data.calls.filter((call) => call.toMillis() > periodStart.toMillis());
+
+      // Always update the document to persist cleaned calls
+      transaction.set(docRef, {
+        calls: recentCalls,
+        lastReset: now,
+      });
+
+      if (recentCalls.length >= this.maxCalls) {
+        throw new Error("Rate limit exceeded");
+      }
+
+      // Add current call and update again
+      recentCalls.push(now);
+      transaction.set(docRef, {
+        calls: recentCalls,
+        lastReset: now,
+      });
+    });
+  }
+}
 
 admin.initializeApp();
 const db = admin.firestore();
 
-const unauthLimiter = FirebaseFunctionsRateLimiter.withFirestoreBackend(
-    {name: "unauth_rate_limiter", maxCalls: 40, periodSeconds: 60},
-    db,
-);
-
-const authLimiter = FirebaseFunctionsRateLimiter.withFirestoreBackend(
-    {name: "user_rate_limiter", maxCalls: 40, periodSeconds: 60},
-    db,
-);
+const unauthLimiter = new SimpleRateLimiter("unauth_rate_limiter", 40, 60, db);
+const authLimiter = new SimpleRateLimiter("user_rate_limiter", 40, 60, db);
 
 const stripeSecretKeyDev = defineSecret("STRIPE_SECRET_KEY_DEV");
 const stripeWebhookSecretDev = defineSecret("STRIPE_WEBHOOK_SECRET_DEV");
