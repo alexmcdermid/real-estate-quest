@@ -29,7 +29,7 @@ firebase deploy --only functions
 npm run lint:fix
 ```
 
-### firebase deploy fe
+### firebase deploy functions deploy with env
 ```
 firebase deploy --only functions -P dev
 firebase deploy --only functions -P prod
