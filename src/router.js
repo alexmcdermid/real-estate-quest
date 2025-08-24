@@ -7,17 +7,93 @@ import PrivacyPolicy from './components/privacyPolicy.vue';
 import TermsOfService from './components/ToS.vue';
 
 const routes = [
-  { path: '/', component: LandingPage },
-  { path: '/pro', component: ProfilePage },
-  { path: '/questions', component: QuestionsPage },
-  { path: '/flashcards', component: FlashCardPage },
-  { path: '/privacy-policy', component: PrivacyPolicy },
-  { path: '/terms-of-service', component: TermsOfService },
+  { 
+    path: '/', 
+    component: LandingPage,
+    meta: { 
+      title: 'Real Estate Quest - BC Licensing Exam Preparation',
+      description: 'BC Real Estate Quest: Your guide for BC real estate exam prep. Access 1000+ practice questions and flashcards to help you pass the British Columbia real estate licensing course exam on your first try.'
+    }
+  },
+  { 
+    path: '/pro', 
+    component: ProfilePage,
+    meta: { 
+      title: 'Membership - Real Estate Quest',
+      description: 'Upgrade to Pro for unlimited access to BC real estate exam questions and flashcards.',
+      noindex: true // Prevent indexing of payment/subscription pages
+    }
+  },
+  { 
+    path: '/questions', 
+    component: QuestionsPage,
+    meta: { 
+      title: 'Questions - Real Estate Quest',
+      description: 'Test your knowledge with 1000+ BC real estate licensing exam practice questions.'
+    }
+  },
+  { 
+    path: '/flashcards', 
+    component: FlashCardPage,
+    meta: { 
+      title: 'Flashcards - Real Estate Quest',
+      description: 'Study with interactive flashcards for the BC real estate licensing exam.'
+    }
+  },
+  { 
+    path: '/privacy-policy', 
+    component: PrivacyPolicy,
+    meta: { 
+      title: 'Privacy Policy - Real Estate Quest',
+      description: 'Privacy policy for Real Estate Quest BC exam prep platform.'
+    }
+  },
+  { 
+    path: '/terms-of-service', 
+    component: TermsOfService,
+    meta: { 
+      title: 'Terms of Service - Real Estate Quest',
+      description: 'Terms of service for Real Estate Quest BC exam prep platform.'
+    }
+  },
 ];
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
+});
+
+// Handle meta tags
+router.beforeEach((to, from, next) => {
+  // Update document title
+  if (to.meta.title) {
+    document.title = to.meta.title;
+  }
+  
+  // Update meta description
+  if (to.meta.description) {
+    let metaDescription = document.querySelector('meta[name="description"]');
+    if (metaDescription) {
+      metaDescription.setAttribute('content', to.meta.description);
+    }
+  }
+  
+  // Handle noindex meta tag
+  let metaRobots = document.querySelector('meta[name="robots"]');
+  if (to.meta.noindex) {
+    if (!metaRobots) {
+      metaRobots = document.createElement('meta');
+      metaRobots.setAttribute('name', 'robots');
+      document.head.appendChild(metaRobots);
+    }
+    metaRobots.setAttribute('content', 'noindex, nofollow');
+  } else {
+    if (metaRobots) {
+      metaRobots.setAttribute('content', 'index, follow');
+    }
+  }
+  
+  next();
 });
 
 export default router;
