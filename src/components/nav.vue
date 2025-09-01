@@ -27,9 +27,6 @@
     <v-btn v-if="isAdmin" text class="nav-link d-none d-md-flex" @click="navigateTo('/admin')">
       <span>Admin</span>
     </v-btn>
-    <v-btn v-if="isAdmin" icon class="nav-link d-flex d-md-none" @click="navigateTo('/admin')" aria-label="Admin">
-      <v-icon>mdi-shield-account</v-icon>
-    </v-btn>
 
     <v-btn icon class="nav-link" @click="navigateTo('/pro')">
       <span>Pro</span>
