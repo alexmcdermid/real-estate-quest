@@ -21,6 +21,7 @@ export const useAuthStore = defineStore('auth', () => {
   const member = ref(null);
   const proStatus = ref(null); // Raw status from claims
   const proExpires = ref(null);
+  const isAdmin = ref(false);
   const authInitialized = ref(false); // Tracks initial listener run
 
   // --- Getters (Computed State) ---
@@ -33,6 +34,7 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = null;
       member.value = null;
       proStatus.value = null;
+      isAdmin.value = false;
       return; // Exit early if no user
     }
 
@@ -45,15 +47,18 @@ export const useAuthStore = defineStore('auth', () => {
       const currentMember = idTokenResult.claims.member || null;
       const currentProStatus = idTokenResult.claims.proStatus || null;
       const currentExpiry = idTokenResult.claims.expires || null;
+      const currentAdmin = idTokenResult.claims.isAdmin || false;
 
       member.value = currentMember; // Update member
       proStatus.value = currentProStatus; // Update proStatus
       proExpires.value = currentExpiry; // Update proExpires
+      isAdmin.value = currentAdmin; // Update admin status
     } catch (error) {
       console.error("Error getting ID token result/claims:", error);
       member.value = null;
       proStatus.value = null;
       proExpires.value = null; 
+      isAdmin.value = false;
     }
   }
 
@@ -131,6 +136,7 @@ export const useAuthStore = defineStore('auth', () => {
     proStatus,
     authInitialized,
     proExpires,
+    isAdmin,
 
     // Getters (Computed)
     isAuthenticated,

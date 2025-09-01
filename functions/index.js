@@ -848,6 +848,7 @@ export const syncClaimsOnManualUpdate = onDocumentUpdated(
           member: afterData.member === true,
           proStatus: afterData.subscriptionType || null,
           expires: afterData.cancelAt ? afterData.cancelAt.seconds : null,
+          isAdmin: afterData.admin === true,
         };
 
         try {
@@ -858,6 +859,7 @@ export const syncClaimsOnManualUpdate = onDocumentUpdated(
             member: currentClaims.member === true,
             proStatus: currentClaims.proStatus || null,
             expires: currentClaims.expires || null,
+            isAdmin: currentClaims.isAdmin === true,
           };
 
           const needsUpdate = JSON.stringify(desiredClaims) !== JSON.stringify(currentClaimsToCompare);
@@ -880,3 +882,141 @@ export const syncClaimsOnManualUpdate = onDocumentUpdated(
       }
       return null;
     });
+
+export const getAdminData = onCall(
+    {
+      region: "us-west1",
+      enforceAppCheck: true,
+    },
+    async (request) => {
+      const authContext = request.auth;
+
+      if (!authContext || !authContext.uid) {
+        throw new HttpsError("unauthenticated", "Authentication required");
+      }
+
+      // Check if user is admin
+      const isAdminClaim = authContext.token?.isAdmin;
+      if (!isAdminClaim) {
+        throw new HttpsError("permission-denied", "Admin access required");
+      }
+
+      const userId = authContext.uid;
+      console.log(`Admin data request from user: ${userId}`);
+
+      try {
+        // Get all Firebase Auth users
+        let allUsers = [];
+        let totalAuthUsers = 0;
+        try {
+          const listUsersResult = await admin.auth().listUsers();
+          totalAuthUsers = listUsersResult.users.length;
+          allUsers = listUsersResult.users.map((user) => ({
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            creationTime: user.metadata.creationTime,
+            lastSignInTime: user.metadata.lastSignInTime,
+            emailVerified: user.emailVerified,
+            customClaims: user.customClaims || {},
+          }));
+        } catch (authError) {
+          console.error("Error fetching users from Auth:", authError);
+        }
+
+        // Get all members data (paying customers)
+        // this defaults to 1000 users
+        // for more would need server pagination
+        const membersSnapshot = await db.collection("members").get();
+        const members = [];
+
+        for (const doc of membersSnapshot.docs) {
+          const memberData = doc.data();
+          memberData.id = doc.id;
+
+          // Convert Timestamps to readable dates
+          if (memberData.cancelAt) {
+            memberData.cancelAt = memberData.cancelAt.toDate().toISOString();
+          }
+
+          members.push(memberData);
+        }
+
+        // Get all rate limit logs (last 1000 entries)
+        const rateLimitSnapshot = await db.collection("rate_limit_logs")
+            .orderBy("timestamp", "desc")
+            .limit(1000)
+            .get();
+
+        const rateLimitLogs = [];
+        rateLimitSnapshot.docs.forEach((doc) => {
+          const logData = doc.data();
+          logData.id = doc.id;
+
+          // Convert Timestamp to readable date
+          if (logData.timestamp) {
+            logData.timestamp = logData.timestamp.toDate().toISOString();
+          }
+
+          rateLimitLogs.push(logData);
+        });
+
+        // Get content stats
+        const questionsSnapshotSize = (await db.collection("questions").get()).size;
+        const flashcardsSnapshotSize = (await db.collection("flashcards").get()).size;
+
+        // Calculate stats (exclude admin accounts from member counts)
+        const adminUsers = members.filter((m) => m.admin === true).length;
+
+        // Members excluding admin accounts
+        const nonAdminMembers = members.filter((m) => m.admin !== true);
+
+        // Members are defined as users with an active Monthly or Lifetime subscription
+        const monthlyMembers = nonAdminMembers.filter((m) =>
+          m.subscriptionType === "Monthly" && m.member === true,
+        ).length;
+        const lifetimeMembers = nonAdminMembers.filter((m) =>
+          m.subscriptionType === "Lifetime" && m.member === true,
+        ).length;
+
+        // Total members is the sum of monthly + lifetime (exclude admin accounts)
+        const totalMembers = monthlyMembers + lifetimeMembers;
+
+        // Rate limit stats
+        const rateLimitStats = {
+          totalLogs: rateLimitLogs.length,
+          questionLogs: rateLimitLogs.filter((log) => log.type === "questions").length,
+          flashcardLogs: rateLimitLogs.filter((log) => log.type === "flashcards").length,
+          uniqueIPs: [...new Set(rateLimitLogs.map((log) => log.ip).filter(Boolean))].length,
+          uniqueUsers: [...new Set(rateLimitLogs.map((log) => log.uid).filter(Boolean))].length,
+        };
+
+        console.log(`Admin data request completed. ` +
+          `Returning ${totalAuthUsers} auth users, ${totalMembers} members ` +
+          `and ${rateLimitLogs.length} rate limit logs.`);
+
+        return {
+          users: allUsers,
+          members,
+          rateLimitLogs,
+          stats: {
+            totalAuthUsers,
+            totalMembers,
+            activeMembers,
+            monthlyMembers,
+            lifetimeMembers,
+            adminUsers,
+            contentStats: {
+              totalQuestions: questionsSnapshotSize,
+              totalFlashcards: flashcardsSnapshotSize,
+            },
+            rateLimitStats,
+          },
+          timestamp: new Date().toISOString(),
+        };
+      } catch (error) {
+        console.error("Error fetching admin data:", error);
+        throw new HttpsError("internal", "Failed to fetch admin data");
+      }
+    },
+);

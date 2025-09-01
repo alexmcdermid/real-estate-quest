@@ -1,10 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import { useAuthStore } from './composables/useAuth';
 import LandingPage from './components/landing.vue';
 import ProfilePage from './components/profile.vue';
 import QuestionsPage from './components/questions.vue';
 import FlashCardPage from './components/flashcards.vue';
 import PrivacyPolicy from './components/privacyPolicy.vue';
 import TermsOfService from './components/ToS.vue';
+import AdminPage from './components/admin.vue';
 
 const routes = [
   { 
@@ -13,6 +15,16 @@ const routes = [
     meta: { 
       title: 'Real Estate Quest - BC Licensing Exam Preparation',
       description: 'BC Real Estate Quest: Your guide for BC real estate exam prep. Access 1000+ practice questions and flashcards to help you pass the British Columbia real estate licensing course exam on your first try.'
+    }
+  },
+  { 
+    path: '/admin', 
+    component: AdminPage,
+    meta: { 
+      title: 'Admin Dashboard - Real Estate Quest',
+      description: 'Administrative dashboard for system management.',
+      noindex: true,
+      requiresAdmin: true
     }
   },
   { 
@@ -63,8 +75,37 @@ const router = createRouter({
   routes,
 });
 
-// Handle meta tags
+// Handle meta tags and route protection
 router.beforeEach((to, from, next) => {
+  // Check admin route protection
+  if (to.meta.requiresAdmin) {
+    const authStore = useAuthStore();
+    
+    // Wait for auth to initialize if not already done
+    if (!authStore.authInitialized) {
+      // Watch for auth initialization
+      const unwatch = authStore.$subscribe(() => {
+        if (authStore.authInitialized) {
+          unwatch();
+          if (authStore.isAdmin) {
+            next();
+          } else {
+            console.warn('Access denied: Admin privileges required');
+            next('/'); // Redirect to home
+          }
+        }
+      });
+      return;
+    }
+    
+    // Auth is initialized, check admin status
+    if (!authStore.isAdmin) {
+      console.warn('Access denied: Admin privileges required');
+      next('/'); // Redirect to home
+      return;
+    }
+  }
+
   // Update document title
   if (to.meta.title) {
     document.title = to.meta.title;
