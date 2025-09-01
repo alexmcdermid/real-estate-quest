@@ -23,6 +23,14 @@
 
     <v-spacer />
 
+    <!-- Admin Button (only visible to admin users) -->
+    <v-btn v-if="isAdmin" text class="nav-link d-none d-md-flex" @click="navigateTo('/admin')">
+      <span>Admin</span>
+    </v-btn>
+    <v-btn v-if="isAdmin" icon class="nav-link d-flex d-md-none" @click="navigateTo('/admin')" aria-label="Admin">
+      <v-icon>mdi-shield-account</v-icon>
+    </v-btn>
+
     <v-btn icon class="nav-link" @click="navigateTo('/pro')">
       <span>Pro</span>
     </v-btn>
@@ -72,7 +80,7 @@ import OptionModal from "./optionModal.vue";
 import defaultAvatar from "@/assets/default-avatar.png";
 
 const authStore = useAuthStore();
-const { isAuthenticated, user } = storeToRefs(authStore);
+const { isAuthenticated, user, isAdmin } = storeToRefs(authStore);
 
 const { isDark, darkModeIcon, toggleDarkMode } = useDark();
 const userPhotoURL = computed(() => user.value?.photoURL || defaultAvatar);

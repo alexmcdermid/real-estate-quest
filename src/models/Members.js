@@ -8,4 +8,5 @@
  * @property {string} subscriptionId - The unique identifier for the specific subscription in the payment processing system (e.g., Stripe subscription ID).
  * @property {string} subscriptionType - The type or billing frequency of the subscription (e.g., "Monthly", "Lifetime").
  * @property {boolean} manualClaimSyncRequired - A flag to indicate a manual sync is required for claims.
+ * @property {boolean} admin - A flag indicating whether the user has admin privileges (default: false, can only be set manually in Firebase console).
  */
