@@ -925,6 +925,8 @@ export const getAdminData = onCall(
         }
 
         // Get all members data (paying customers)
+        // this defaults to 1000 users
+        // for more would need server pagination
         const membersSnapshot = await db.collection("members").get();
         const members = [];
 
