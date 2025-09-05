@@ -43,7 +43,7 @@
       <v-col cols="12" md="8" class="text-center">
         <h2>Why Choose BC Real Estate Quest?</h2>
         <p>
-          BC Real Estate Quest is a focused, intuitive platform built specifically for BC Real Estate Licensing Exam preparation. Our exam guide and practice questions help you master the material that matters:
+          BC Real Estate Quest is a focused, intuitive platform built specifically for BC Real Estate Licensing Exam preparation. Our exam practice questions and flashcards help you master the material that matters:
         </p>
       </v-col>
     </v-row>
