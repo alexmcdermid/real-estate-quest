@@ -306,7 +306,89 @@
           </v-data-table>
         </v-card>
       </v-col>
+
+      <!-- Function Error Logs Table -->
+      <v-col cols="12" class="mt-4">
+        <v-card elevation="2">
+          <v-card-title class="text-h6">
+            <v-icon left color="error">mdi-bug</v-icon>
+            Error Logs ({{ filteredErrorLogs.length }})
+            <v-spacer></v-spacer>
+            <v-text-field
+              v-model="errorSearch"
+              append-icon="mdi-magnify"
+              label="Search errors..."
+              single-line
+              hide-details
+              density="compact"
+              style="max-width: 300px;"
+            ></v-text-field>
+          </v-card-title>
+          <v-data-table
+            :headers="errorHeaders"
+            :items="filteredErrorLogs"
+            :search="errorSearch"
+            :items-per-page="15"
+            class="elevation-1"
+          >
+            <template v-slot:item.timestamp="{ item }">
+              {{ formatDate(item.lastSeen || item.timestamp) }}
+            </template>
+            <template v-slot:item.functionName="{ item }">
+              <v-chip color="primary" size="small">{{ item.functionName }}</v-chip>
+            </template>
+            <template v-slot:item.bucket="{ item }">
+              <v-chip size="small" :color="item.bucket === 'stripe' ? 'error' : 'grey'">{{ item.bucket || 'generic' }}</v-chip>
+            </template>
+            <template v-slot:item.message="{ item }">
+              <span>{{ (item.message || '').slice(0, 120) }}<span v-if="(item.message||'').length>120">...<v-btn text small @click="showErrorDetails(item)">details</v-btn></span></span>
+            </template>
+            <template v-slot:item.authUid="{ item }">
+              <code v-if="item.authUid">{{ item.authUid }}</code>
+              <span v-else class="text-grey">-</span>
+            </template>
+            <template v-slot:item.ip="{ item }">
+              <code>{{ item.ip || 'Unknown' }}</code>
+            </template>
+            <template v-slot:item.occurrences="{ item }">
+              <v-chip size="small">{{ item.occurrences || 1 }}</v-chip>
+            </template>
+          </v-data-table>
+        </v-card>
+      </v-col>
     </v-row>
+
+    <!-- Error Details Dialog -->
+    <v-dialog v-model="errorDialog.show" max-width="800px">
+      <v-card>
+        <v-card-title>
+          Error Details
+          <v-spacer></v-spacer>
+          <v-btn icon @click="errorDialog.show = false"><v-icon>mdi-close</v-icon></v-btn>
+        </v-card-title>
+        <v-card-text>
+          <div v-if="errorDialog.item">
+            <p><strong>Function:</strong> {{ errorDialog.item.functionName }}</p>
+            <p><strong>Bucket:</strong> {{ errorDialog.item.bucket || 'generic' }}</p>
+            <p><strong>User-friendly:</strong> <em>{{ errorDialog.item.humanMessage || '-' }}</em></p>
+            <p><strong>Message:</strong> <code>{{ errorDialog.item.message }}</code></p>
+            <p><strong>First Seen:</strong> {{ formatDate(errorDialog.item.firstSeen) }}</p>
+            <p><strong>Last Seen:</strong> {{ formatDate(errorDialog.item.lastSeen) }}</p>
+            <p><strong>Occurrences:</strong> {{ errorDialog.item.occurrences }}</p>
+            <p><strong>Auth UID:</strong> {{ errorDialog.item.authUid || '-' }}</p>
+            <p><strong>IP:</strong> {{ errorDialog.item.ip || '-' }}</p>
+            <p><strong>Request Data:</strong></p>
+            <pre style="white-space:pre-wrap">{{ errorDialog.item.requestData || '-' }}</pre>
+            <p><strong>Stack:</strong></p>
+            <pre style="white-space:pre-wrap">{{ errorDialog.item.stack || '-' }}</pre>
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="primary" text @click="errorDialog.show = false">Close</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <!-- Snackbar for notifications -->
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000">
@@ -365,6 +447,16 @@ const rateLimitHeaders = [
   { title: 'Qualifier', key: 'qualifier', sortable: true }
 ];
 
+const errorHeaders = [
+  { title: 'Timestamp', key: 'timestamp', sortable: true },
+  { title: 'Function', key: 'functionName', sortable: true },
+  { title: 'Message', key: 'message', sortable: false },
+  { title: 'Bucket', key: 'bucket', sortable: true },
+  { title: 'UID', key: 'authUid', sortable: true },
+  { title: 'IP', key: 'ip', sortable: true },
+  { title: 'Occurrences', key: 'occurrences', sortable: true },
+];
+
 const usersHeaders = [
   { title: 'User ID', key: 'uid', sortable: true },
   { title: 'Email', key: 'email', sortable: true },
@@ -383,6 +475,19 @@ const filteredRateLimitLogs = computed(() => {
   if (!adminData.value) return [];
   return adminData.value.rateLimitLogs;
 });
+
+const errorSearch = ref('');
+const filteredErrorLogs = computed(() => {
+  if (!adminData.value) return [];
+  return adminData.value.errorLogs || [];
+});
+
+const errorDialog = ref({ show: false, item: null });
+
+function showErrorDetails(item) {
+  errorDialog.value.item = item;
+  errorDialog.value.show = true;
+}
 
 const usersSearch = ref('');
 const filteredUsers = computed(() => {

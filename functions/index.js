@@ -104,6 +104,109 @@ let stripe;
 //   }, indent);
 // }
 
+/**
+ * Writes structured function error logs to Firestore with simple deduplication.
+ * If a matching error (same functionName, message, authUid/ip) exists within
+ * ERROR_DEDUPE_WINDOW_SECONDS it will increment `occurrences` and update `lastSeen`.
+ * The helper will never throw.
+ *
+ * @param {Error|any} err
+ * @param {object} meta - { functionName, uid, ip, requestData, severity }
+ */
+async function logFunctionError(err, meta = {}) {
+  const ERROR_DEDUPE_WINDOW_SECONDS = 60 * 60;
+  const MAX_REQUEST_DATA_LENGTH = 2000;
+  try {
+    const now = admin.firestore.Timestamp.now();
+
+    const message = err && err.message ? String(err.message) : String(err || 'unknown error');
+    const stack = err && err.stack ? String(err.stack).slice(0, 10000) : null;
+
+    let requestData = meta.requestData || null;
+    if (requestData && typeof requestData === 'object') {
+      try {
+        requestData = JSON.stringify(requestData);
+      } catch (e) {
+        requestData = String(requestData);
+      }
+    }
+
+    if (requestData && requestData.length > MAX_REQUEST_DATA_LENGTH) {
+      requestData = requestData.slice(0, MAX_REQUEST_DATA_LENGTH) + '... [truncated]';
+    }
+
+    // Determine bucket and user-friendly message
+    const bucket = meta.bucket || (payloadIsStripeError(err, meta) ? 'stripe' : 'generic');
+
+    const humanMessage = meta.humanMessage || (bucket === 'stripe'
+      ? 'Error with payment provider (Stripe). Please contact support.'
+      : 'An unexpected error occurred. If this keeps happening please contact support.');
+
+    const payload = {
+      timestamp: now,
+      firstSeen: now,
+      lastSeen: now,
+      functionName: meta.functionName || meta.fn || 'unknown',
+      message,
+      stack,
+      severity: meta.severity || 'error',
+      authUid: meta.uid || null,
+      ip: meta.ip || null,
+      requestData: requestData || null,
+      bucket,
+      humanMessage,
+      env: process.env.NODE_ENV || 'dev',
+      occurrences: 1,
+    };
+
+    // Attempt a dedupe: look for an existing similar error in the dedupe window
+    const windowStart = admin.firestore.Timestamp.fromMillis(now.toMillis() - (ERROR_DEDUPE_WINDOW_SECONDS * 1000));
+
+    const query = db.collection('function_error_logs')
+      .where('functionName', '==', payload.functionName)
+      .where('message', '==', payload.message)
+      .where('lastSeen', '>=', windowStart)
+      .orderBy('lastSeen', 'desc')
+      .limit(1);
+
+    const snap = await query.get();
+    if (!snap.empty) {
+      const doc = snap.docs[0];
+      try {
+        await doc.ref.update({
+          occurrences: admin.firestore.FieldValue.increment(1),
+          lastSeen: now,
+          // preserve the earliest firstSeen, but update stack/requestData if helpful
+          stack: stack || doc.data().stack || null,
+          requestData: payload.requestData || doc.data().requestData || null,
+        });
+        return;
+      } catch (e) {
+        // fall through to attempt to add new doc if update fails
+        console.error('Failed to update existing error log:', e);
+      }
+    }
+
+    // No recent duplicate found; add a new document
+    await db.collection('function_error_logs').add(payload);
+  } catch (loggerErr) {
+    // Never allow the logger to throw or affect business logic
+    try {
+      console.error('logFunctionError failed:', loggerErr);
+    } catch (ignore) {}
+  }
+}
+
+// Helper to detect likely Stripe errors based on common properties
+function payloadIsStripeError(err, meta) {
+  if (meta && meta.bucket === 'stripe') return true;
+  if (!err) return false;
+  if (err.type || err.code || err.statusCode) return true;
+  const fn = (meta.functionName || meta.fn || '').toLowerCase();
+  if (fn.includes('stripe') || fn.includes('checkout') || fn.includes('billing')) return true;
+  return false;
+}
+
 export const getQuestionsByChapter = onCall(
     {
       region: "us-west1",
@@ -564,7 +667,18 @@ export const createCheckoutSession = onCall(
         return {url: session.url};
       } catch (error) {
         console.error("Error creating Stripe Checkout session:", error);
-        throw new Error("Failed to create Stripe Checkout session");
+        const humanMsg = 'Payment processing error (Stripe). Please try again or contact support if the issue persists.';
+        // Log to Firestore (await so the log is written)
+        await logFunctionError(error, {
+          functionName: 'createCheckoutSession',
+          uid: authContext?.uid || null,
+          ip: request.rawRequest?.ip || null,
+          requestData: { type, isProd: isProduction },
+          severity: 'error',
+          bucket: 'stripe',
+          humanMessage: humanMsg,
+        });
+        throw new HttpsError('internal', humanMsg);
       }
     },
 );
@@ -603,6 +717,15 @@ export const handleStripeWebhook = onRequest(
         event = stripe.webhooks.constructEvent(req.rawBody, sig, stripeWebhookSecret.value());
       } catch (err) {
         console.error("Webhook signature verification failed:", err.message);
+        await logFunctionError(err, {
+          functionName: 'handleStripeWebhook',
+          uid: null,
+          ip: req.ip || req.rawRequest?.ip || null,
+          requestData: { eventType: req.body?.type },
+          severity: 'warning',
+          bucket: 'stripe',
+          humanMessage: 'Payment webhook error. Check logs and Stripe dashboard.',
+        });
         return res.status(400).send(`Webhook Error: ${err.message}`);
       }
 
@@ -963,6 +1086,26 @@ export const getAdminData = onCall(
           rateLimitLogs.push(logData);
         });
 
+        // Get recent function error logs (last 1000)
+        let errorLogs = [];
+        try {
+          const errorSnapshot = await db.collection('function_error_logs')
+            .orderBy('lastSeen', 'desc')
+            .limit(1000)
+            .get();
+
+          errorSnapshot.docs.forEach((doc) => {
+            const e = doc.data();
+            e.id = doc.id;
+            if (e.timestamp) e.timestamp = e.timestamp.toDate().toISOString();
+            if (e.firstSeen) e.firstSeen = e.firstSeen.toDate().toISOString();
+            if (e.lastSeen) e.lastSeen = e.lastSeen.toDate().toISOString();
+            errorLogs.push(e);
+          });
+        } catch (err) {
+          console.error('Failed to fetch function_error_logs:', err);
+        }
+
         // Get content stats
         const questionsSnapshotSize = (await db.collection("questions").get()).size;
         const flashcardsSnapshotSize = (await db.collection("flashcards").get()).size;
@@ -1001,6 +1144,7 @@ export const getAdminData = onCall(
           users: allUsers,
           members,
           rateLimitLogs,
+          errorLogs,
           stats: {
             totalAuthUsers,
             totalMembers,
@@ -1018,6 +1162,14 @@ export const getAdminData = onCall(
         };
       } catch (error) {
         console.error("Error fetching admin data:", error);
+        await logFunctionError(error, {
+          functionName: 'getAdminData',
+          uid: authContext?.uid || null,
+          ip: request.rawRequest?.ip || null,
+          severity: 'error',
+          bucket: 'generic',
+          humanMessage: 'An internal server error occurred while loading admin data.',
+        });
         throw new HttpsError("internal", "Failed to fetch admin data");
       }
     },

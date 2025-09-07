@@ -2,6 +2,7 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp } from "../config/firebaseConfig";
 import { CACHE_KEY, STALE_TIME } from "../config/constants"
 import { showRateLimitBanner } from './useRateLimitBanner';
+import { showNotification } from './useNotifier';
  
 /**
  * Encodes a Unicode string to Base64.
@@ -72,6 +73,7 @@ export async function fetchQuestionsByChapter(chapter = 1) {
       return [];
     }
     console.error("Error fetching questions:", error);
+    showNotification('An unexpected error occurred while fetching questions.', 'error', 5000);
     return error;
   }
 }
