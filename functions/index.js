@@ -682,7 +682,7 @@ export const createCheckoutSession = onCall(
         return {url: session.url};
       } catch (error) {
         console.error("Error creating Stripe Checkout session:", error);
-        const humanMsg = "Payment processing error (Stripe). Please try again or contact support if the issue persists.";
+        const humanMsg = "Error on create checkout session (Stripe). Please try again or contact support if the issue persists.";
         await logFunctionError(error, {
           functionName: "createCheckoutSession",
           uid: authContext?.uid || null,
@@ -956,7 +956,17 @@ export const manageSubscription = onCall(
         return {url: session.url};
       } catch (error) {
         console.error("Error creating billing portal session:", error);
-        throw new Error("Failed to create billing portal session");
+        const humanMsg = "Error on manage subscription (Stripe). Please try again or contact support if the issue persists.";
+        await logFunctionError(error, {
+          functionName: "createCheckoutSession",
+          uid: authContext?.uid || null,
+          ip: request.rawRequest?.ip || null,
+          requestData: {type, isProd: isProduction},
+          severity: "error",
+          bucket: "stripe",
+          humanMessage: humanMsg,
+        });
+        throw new HttpsError("internal", humanMsg);
       }
     },
 );
