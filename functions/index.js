@@ -632,9 +632,9 @@ export const handleStripeWebhook = onRequest(
               await userDocRef.set(
                   {
                     member: true,
-                    subscriptionId,
-                    customerId,
-                    subscriptionType,
+                    subscriptionId: subscriptionId,
+                    customerId: customerId,
+                    subscriptionType: subscriptionType,
                   },
                   {merge: true},
               );
@@ -667,9 +667,9 @@ export const handleStripeWebhook = onRequest(
 
               await userDocRef.set(
                   {
-                    customerId,
+                    customerId: customerId,
                     subscriptionId: admin.firestore.FieldValue.delete(),
-                    subscriptionType: "Lifetime",
+                    subscriptionType: subscriptionType,
                     cancelAt: admin.firestore.FieldValue.delete(),
                     member: true,
                   },
@@ -684,7 +684,7 @@ export const handleStripeWebhook = onRequest(
                 await admin.auth().setCustomUserClaims(userId, {
                   ...existingClaims,
                   member: true,
-                  proStatus: "Lifetime",
+                  proStatus: subscriptionType,
                 });
 
                 console.log(`User ${userId} upgraded to Lifetime successfully.`);
@@ -727,6 +727,7 @@ export const handleStripeWebhook = onRequest(
               await db.collection("members").doc(userId).set(
                   {
                     cancelAt: admin.firestore.Timestamp.fromDate(cancelDate),
+                    cancelTime: admin.firestore.FieldValue.serverTimestamp(),
                   },
                   {merge: true},
               );
@@ -747,6 +748,7 @@ export const handleStripeWebhook = onRequest(
               await db.collection("members").doc(userId).set(
                   {
                     cancelAt: admin.firestore.FieldValue.delete(),
+                    resumeTime: admin.firestore.FieldValue.serverTimestamp(),
                   },
                   {merge: true},
               );

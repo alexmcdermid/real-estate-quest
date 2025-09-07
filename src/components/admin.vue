@@ -201,12 +201,24 @@
               </v-chip>
               <span v-else>-</span>
             </template>
+            <template v-slot:item.customerId="{ item }">
+              <code v-if="item.customerId">{{ item.customerId }}</code>
+              <span v-else class="text-grey">-</span>
+            </template>
             <template v-slot:item.subscriptionId="{ item }">
               <code v-if="item.subscriptionId">{{ item.subscriptionId }}</code>
               <span v-else class="text-grey">-</span>
             </template>
             <template v-slot:item.cancelAt="{ item }">
               <span v-if="item.cancelAt">{{ formatDate(item.cancelAt) }}</span>
+              <span v-else>-</span>
+            </template>
+            <template v-slot:item.cancelTime="{ item }">
+              <span v-if="item.cancelTime">{{ formatDate(item.cancelTime) }}</span>
+              <span v-else>-</span>
+            </template>
+            <template v-slot:item.resumeTime="{ item }">
+              <span v-if="item.resumeTime">{{ formatDate(item.resumeTime) }}</span>
               <span v-else>-</span>
             </template>
           </v-data-table>
@@ -337,10 +349,12 @@ const memberHeaders = [
   { title: 'User ID', key: 'id', sortable: true },
   { title: 'Status', key: 'member', sortable: true },
   { title: 'Role', key: 'admin', sortable: true },
+  { title: 'Customer ID', key: 'customerId', sortable: true },
   { title: 'Subscription', key: 'subscriptionType', sortable: true },
   { title: 'Subscription ID', key: 'subscriptionId', sortable: true },
-  { title: 'Cancel Date', key: 'cancelAt', sortable: true },
-  { title: 'Customer ID', key: 'customerId', sortable: true }
+  { title: 'Cancel Date', key: 'cancelTime', sortable: true },
+  { title: 'Cancel At Date', key: 'cancelAt', sortable: true },
+  { title: 'Resume Date', key: 'resumeTime', sortable: true }
 ];
 
 const rateLimitHeaders = [
@@ -385,9 +399,31 @@ function showNotification(message, color = 'success') {
   };
 }
 
-function formatDate(dateString) {
-  if (!dateString) return '-';
-  return new Date(dateString).toLocaleString();
+function formatDate(val) {
+  if (!val) return '-';
+
+  // Firestore Timestamp (client SDK)
+  if (typeof val === 'object' && typeof val.toDate === 'function') {
+    return val.toDate().toLocaleString();
+  }
+
+  // Admin SDK / serialized Timestamp object
+  if (typeof val === 'object' && (('seconds' in val) || ('_seconds' in val))) {
+    const secs = ('seconds' in val) ? val.seconds : val._seconds;
+    const nanos = ('nanoseconds' in val) ? val.nanoseconds : (val._nanoseconds ?? 0);
+    const ms = secs * 1000 + Math.floor(nanos / 1e6);
+    return new Date(ms).toLocaleString();
+  }
+
+  // Numeric epoch (seconds or ms)
+  if (typeof val === 'number') {
+    const ms = val < 1e12 ? val * 1000 : val;
+    return new Date(ms).toLocaleString();
+  }
+
+  // String/Date-compatible
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? '-' : d.toLocaleString();
 }
 
 function getSubscriptionColor(subscriptionType) {
