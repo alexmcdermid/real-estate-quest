@@ -119,11 +119,11 @@ async function logFunctionError(err, meta = {}) {
   try {
     const now = admin.firestore.Timestamp.now();
 
-    const message = err && err.message ? String(err.message) : String(err || 'unknown error');
+    const message = err && err.message ? String(err.message) : String(err || "unknown error");
     const stack = err && err.stack ? String(err.stack).slice(0, 10000) : null;
 
     let requestData = meta.requestData || null;
-    if (requestData && typeof requestData === 'object') {
+    if (requestData && typeof requestData === "object") {
       try {
         requestData = JSON.stringify(requestData);
       } catch (e) {
@@ -132,42 +132,42 @@ async function logFunctionError(err, meta = {}) {
     }
 
     if (requestData && requestData.length > MAX_REQUEST_DATA_LENGTH) {
-      requestData = requestData.slice(0, MAX_REQUEST_DATA_LENGTH) + '... [truncated]';
+      requestData = requestData.slice(0, MAX_REQUEST_DATA_LENGTH) + "... [truncated]";
     }
 
     // Determine bucket and user-friendly message
-    const bucket = meta.bucket || (payloadIsStripeError(err, meta) ? 'stripe' : 'generic');
+    const bucket = meta.bucket || (payloadIsStripeError(err, meta) ? "stripe" : "generic");
 
-    const humanMessage = meta.humanMessage || (bucket === 'stripe'
-      ? 'Error with payment provider (Stripe). Please contact support.'
-      : 'An unexpected error occurred. If this keeps happening please contact support.');
+    const humanMessage = meta.humanMessage || (bucket === "stripe" ?
+      "Error with payment provider (Stripe). Please contact support." :
+      "An unexpected error occurred. If this keeps happening please contact support.");
 
     const payload = {
       timestamp: now,
       firstSeen: now,
       lastSeen: now,
-      functionName: meta.functionName || meta.fn || 'unknown',
+      functionName: meta.functionName || meta.fn || "unknown",
       message,
       stack,
-      severity: meta.severity || 'error',
+      severity: meta.severity || "error",
       authUid: meta.uid || null,
       ip: meta.ip || null,
       requestData: requestData || null,
       bucket,
       humanMessage,
-      env: process.env.NODE_ENV || 'dev',
+      env: process.env.NODE_ENV || "unknown",
       occurrences: 1,
     };
 
     // Attempt a dedupe: look for an existing similar error in the dedupe window
     const windowStart = admin.firestore.Timestamp.fromMillis(now.toMillis() - (ERROR_DEDUPE_WINDOW_SECONDS * 1000));
 
-    const query = db.collection('function_error_logs')
-      .where('functionName', '==', payload.functionName)
-      .where('message', '==', payload.message)
-      .where('lastSeen', '>=', windowStart)
-      .orderBy('lastSeen', 'desc')
-      .limit(1);
+    const query = db.collection("function_error_logs")
+        .where("functionName", "==", payload.functionName)
+        .where("message", "==", payload.message)
+        .where("lastSeen", ">=", windowStart)
+        .orderBy("lastSeen", "desc")
+        .limit(1);
 
     const snap = await query.get();
     if (!snap.empty) {
@@ -183,27 +183,42 @@ async function logFunctionError(err, meta = {}) {
         return;
       } catch (e) {
         // fall through to attempt to add new doc if update fails
-        console.error('Failed to update existing error log:', e);
+        console.error("Failed to update existing error log:", e);
       }
     }
 
     // No recent duplicate found; add a new document
-    await db.collection('function_error_logs').add(payload);
+    await db.collection("function_error_logs").add(payload);
   } catch (loggerErr) {
     // Never allow the logger to throw or affect business logic
     try {
-      console.error('logFunctionError failed:', loggerErr);
-    } catch (ignore) {}
+      console.error("logFunctionError failed:", loggerErr);
+    } catch (ignore) {
+      // ignore
+    }
   }
 }
 
-// Helper to detect likely Stripe errors based on common properties
+/**
+ * Heuristically determines whether an error is related to Stripe.
+ *
+ * Checks, in order:
+ * - explicit meta.bucket === 'stripe'
+ * - presence of common Stripe error fields on the error object (type, code, statusCode)
+ * - whether the function name contains Stripe-related keywords
+ *
+ * @param {any} err - The thrown error object (may be null/undefined).
+ * @param {Object} [meta] - Optional metadata passed by the caller.
+ * @param {string} [meta.functionName] - Name of the Cloud Function where the error occurred.
+ * @param {string} [meta.bucket] - Explicit bucket override (e.g. 'stripe').
+ * @return {boolean} True when the error is likely a Stripe-related error.
+ */
 function payloadIsStripeError(err, meta) {
-  if (meta && meta.bucket === 'stripe') return true;
+  if (meta && meta.bucket === "stripe") return true;
   if (!err) return false;
   if (err.type || err.code || err.statusCode) return true;
-  const fn = (meta.functionName || meta.fn || '').toLowerCase();
-  if (fn.includes('stripe') || fn.includes('checkout') || fn.includes('billing')) return true;
+  const fn = (meta.functionName || meta.fn || "").toLowerCase();
+  if (fn.includes("stripe") || fn.includes("checkout") || fn.includes("billing")) return true;
   return false;
 }
 
@@ -667,17 +682,17 @@ export const createCheckoutSession = onCall(
         return {url: session.url};
       } catch (error) {
         console.error("Error creating Stripe Checkout session:", error);
-        const humanMsg = 'Payment processing error (Stripe). Please try again or contact support if the issue persists.';
+        const humanMsg = "Payment processing error (Stripe). Please try again or contact support if the issue persists.";
         await logFunctionError(error, {
-          functionName: 'createCheckoutSession',
+          functionName: "createCheckoutSession",
           uid: authContext?.uid || null,
           ip: request.rawRequest?.ip || null,
-          requestData: { type, isProd: isProduction },
-          severity: 'error',
-          bucket: 'stripe',
+          requestData: {type, isProd: isProduction},
+          severity: "error",
+          bucket: "stripe",
           humanMessage: humanMsg,
         });
-        throw new HttpsError('internal', humanMsg);
+        throw new HttpsError("internal", humanMsg);
       }
     },
 );
@@ -717,13 +732,13 @@ export const handleStripeWebhook = onRequest(
       } catch (err) {
         console.error("Webhook signature verification failed:", err.message);
         await logFunctionError(err, {
-          functionName: 'handleStripeWebhook',
+          functionName: "handleStripeWebhook",
           uid: null,
           ip: req.ip || req.rawRequest?.ip || null,
-          requestData: { eventType: req.body?.type },
-          severity: 'warning',
-          bucket: 'stripe',
-          humanMessage: 'Payment webhook error. Check logs and Stripe dashboard.',
+          requestData: {eventType: req.body?.type},
+          severity: "warning",
+          bucket: "stripe",
+          humanMessage: "Payment webhook error. Check logs and Stripe dashboard.",
         });
         return res.status(400).send(`Webhook Error: ${err.message}`);
       }
@@ -1086,12 +1101,12 @@ export const getAdminData = onCall(
         });
 
         // Get recent function error logs (last 1000)
-        let errorLogs = [];
+        const errorLogs = [];
         try {
-          const errorSnapshot = await db.collection('function_error_logs')
-            .orderBy('lastSeen', 'desc')
-            .limit(1000)
-            .get();
+          const errorSnapshot = await db.collection("function_error_logs")
+              .orderBy("lastSeen", "desc")
+              .limit(1000)
+              .get();
 
           errorSnapshot.docs.forEach((doc) => {
             const e = doc.data();
@@ -1102,7 +1117,7 @@ export const getAdminData = onCall(
             errorLogs.push(e);
           });
         } catch (err) {
-          console.error('Failed to fetch function_error_logs:', err);
+          console.error("Failed to fetch function_error_logs:", err);
         }
 
         // Get content stats
@@ -1147,7 +1162,6 @@ export const getAdminData = onCall(
           stats: {
             totalAuthUsers,
             totalMembers,
-            activeMembers,
             monthlyMembers,
             lifetimeMembers,
             adminUsers,
@@ -1162,12 +1176,12 @@ export const getAdminData = onCall(
       } catch (error) {
         console.error("Error fetching admin data:", error);
         await logFunctionError(error, {
-          functionName: 'getAdminData',
+          functionName: "getAdminData",
           uid: authContext?.uid || null,
           ip: request.rawRequest?.ip || null,
-          severity: 'error',
-          bucket: 'generic',
-          humanMessage: 'An internal server error occurred while loading admin data.',
+          severity: "error",
+          bucket: "generic",
+          humanMessage: "An internal server error occurred while loading admin data.",
         });
         throw new HttpsError("internal", "Failed to fetch admin data");
       }
