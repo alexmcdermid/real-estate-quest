@@ -958,10 +958,10 @@ export const manageSubscription = onCall(
         console.error("Error creating billing portal session:", error);
         const humanMsg = "Error on manage subscription (Stripe). Please try again or contact support if the issue persists.";
         await logFunctionError(error, {
-          functionName: "createCheckoutSession",
+          functionName: "manageSubscription",
           uid: authContext?.uid || null,
           ip: request.rawRequest?.ip || null,
-          requestData: {type, isProd: isProduction},
+          requestData: {isProd: isProduction},
           severity: "error",
           bucket: "stripe",
           humanMessage: humanMsg,

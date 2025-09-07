@@ -389,16 +389,6 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
-
-    <!-- Snackbar for notifications -->
-    <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000">
-      {{ snackbar.message }}
-      <template #actions>
-        <v-btn color="white" variant="text" @click="snackbar.show = false">
-          Close
-        </v-btn>
-      </template>
-    </v-snackbar>
   </v-container>
 </template>
 
@@ -408,6 +398,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useAuthStore } from '@/composables/useAuth';
 import { storeToRefs } from 'pinia';
 import { firebaseApp } from '@/config/firebaseConfig';
+import { showNotification } from '@/composables/useNotifier';
 
 const authStore = useAuthStore();
 const { isAdmin } = storeToRefs(authStore);
@@ -420,11 +411,6 @@ const lastUpdated = ref(null);
 const memberSearch = ref('');
 const rateLimitSearch = ref('');
 
-const snackbar = ref({
-  show: false,
-  message: '',
-  color: 'success'
-});
 
 // Table headers
 const memberHeaders = [
@@ -496,13 +482,6 @@ const filteredUsers = computed(() => {
 });
 
 // Methods
-function showNotification(message, color = 'success') {
-  snackbar.value = {
-    show: true,
-    message,
-    color
-  };
-}
 
 function formatDate(val) {
   if (!val) return '-';
@@ -548,7 +527,7 @@ async function fetchAdminData() {
     adminData.value = result.data;
     lastUpdated.value = result.data.timestamp;
     
-    showNotification('Admin data loaded successfully');
+    showNotification('Admin data loaded successfully', 'success');
   } catch (error) {
     console.error('Error fetching admin data:', error);
     showNotification('Error loading admin data: ' + error.message, 'error');
