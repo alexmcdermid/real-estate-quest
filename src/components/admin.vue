@@ -329,6 +329,7 @@
             :items="filteredErrorLogs"
             :search="errorSearch"
             :items-per-page="15"
+            @click:row="onRowClick"
             class="elevation-1"
           >
             <template v-slot:item.timestamp="{ item }">
@@ -341,7 +342,10 @@
               <v-chip size="small" :color="item.bucket === 'stripe' ? 'error' : 'grey'">{{ item.bucket || 'generic' }}</v-chip>
             </template>
             <template v-slot:item.message="{ item }">
-              <span>{{ (item.message || '').slice(0, 120) }}<span v-if="(item.message||'').length>120">...<v-btn text small @click="showErrorDetails(item)">details</v-btn></span></span>
+              <span>
+                {{ (item.message || '').slice(0, 120) }}
+                <span v-if="(item.message||'').length>120">...</span>
+              </span>
             </template>
             <template v-slot:item.authUid="{ item }">
               <code v-if="item.authUid">{{ item.authUid }}</code>
@@ -359,12 +363,12 @@
     </v-row>
 
     <!-- Error Details Dialog -->
-    <v-dialog v-model="errorDialog.show" max-width="800px">
+    <v-dialog v-model="errorDialog.show" max-width="1200px">
       <v-card>
-        <v-card-title>
-          Error Details
+        <v-card-title class="d-flex">
+          <span class="d-flex align-center">Error Details</span>
           <v-spacer></v-spacer>
-          <v-btn icon @click="errorDialog.show = false"><v-icon>mdi-close</v-icon></v-btn>
+          <v-btn color="primary" size="small" variant="outlined" icon="mdi-close" @click="errorDialog.show = false" />
         </v-card-title>
         <v-card-text>
           <div v-if="errorDialog.item">
@@ -375,7 +379,7 @@
             <p><strong>First Seen:</strong> {{ formatDate(errorDialog.item.firstSeen) }}</p>
             <p><strong>Last Seen:</strong> {{ formatDate(errorDialog.item.lastSeen) }}</p>
             <p><strong>Occurrences:</strong> {{ errorDialog.item.occurrences }}</p>
-            <p><strong>Auth UID:</strong> {{ errorDialog.item.authUid || '-' }}</p>
+            <p><strong>Auth User UUID:</strong> {{ errorDialog.item.authUid || '-' }}</p>
             <p><strong>IP:</strong> {{ errorDialog.item.ip || '-' }}</p>
             <p><strong>Request Data:</strong></p>
             <pre style="white-space:pre-wrap">{{ errorDialog.item.requestData || '-' }}</pre>
@@ -385,7 +389,10 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="primary" text @click="errorDialog.show = false">Close</v-btn>
+          <v-btn color="primary" text @click="errorDialog.show = false">
+            <v-icon left>mdi-close</v-icon>
+            Close
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -438,7 +445,7 @@ const errorHeaders = [
   { title: 'Function', key: 'functionName', sortable: true },
   { title: 'Message', key: 'message', sortable: false },
   { title: 'Bucket', key: 'bucket', sortable: true },
-  { title: 'UID', key: 'authUid', sortable: true },
+  { title: 'User UUID', key: 'authUid', sortable: true },
   { title: 'IP', key: 'ip', sortable: true },
   { title: 'Occurrences', key: 'occurrences', sortable: true },
 ];
@@ -473,6 +480,27 @@ const errorDialog = ref({ show: false, item: null });
 function showErrorDetails(item) {
   errorDialog.value.item = item;
   errorDialog.value.show = true;
+}
+
+function onRowClick(...args) {
+  const payload = args.length === 1 ? args[0] : args[1];
+  if (!payload) return;
+
+  let row = payload;
+  if (payload.item) {
+    row = payload.item;
+  } else if (payload.raw) {
+    row = payload.raw;
+  } else if (payload.internalItem && payload.internalItem.raw) {
+    row = payload.internalItem.raw;
+  }
+
+  if (row && row.value && Array.isArray(filteredErrorLogs.value)) {
+    const found = filteredErrorLogs.value.find((r) => r.id === row.value || r.id === row.key);
+    if (found) row = found;
+  }
+
+  if (row) showErrorDetails(row);
 }
 
 const usersSearch = ref('');
