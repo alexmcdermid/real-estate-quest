@@ -3,6 +3,7 @@ import { firebaseApp } from "../config/firebaseConfig";
 import { CACHE_KEY, STALE_TIME } from "../config/constants";
 import { encodeCache, decodeCache } from "./useQuestion";
 import { showRateLimitBanner } from './useRateLimitBanner';
+import { showNotification } from './useNotifier';
 
 /**
  * Fetches flashcards for a specific chapter
@@ -47,6 +48,7 @@ export async function fetchFlashcardsByChapter(chapter = 1) {
       return [];
     }
     console.error("Error fetching flashcards:", error);
+    showNotification('An unexpected error occurred while fetching flashcards.', 'error', 5000);
     throw error;
   }
 }

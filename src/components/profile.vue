@@ -21,7 +21,7 @@
                         outlined
                         :elevation="isHovering ? 8 : 2"
                         class="clickable-card"
-                        @click="manageSubscription"
+                        @click="handleManageSubscription"
                       >
                         <v-card-title>Pro Status: Monthly</v-card-title>
                         <v-card-text>
@@ -30,7 +30,7 @@
                           <p>You can manage your subscription below.</p>
                         </v-card-text>
                         <v-card-actions>
-                          <v-btn color="primary" @click.stop="manageSubscription">
+                          <v-btn :loading="loadingManage" color="primary" @click.stop="handleManageSubscription">
                             Manage Subscription
                           </v-btn>
                         </v-card-actions>
@@ -53,7 +53,7 @@
                           <p>Unlimited lifetime access to all content.</p>
                         </v-card-text>
                         <v-card-actions>
-                          <v-btn color="primary" @click.stop="handleSubscriptionClick('lifetime')">
+                          <v-btn :loading="loadingLifetime" color="primary" @click.stop="handleSubscriptionClick('lifetime')">
                             {{ isAuthenticated ? "Buy Lifetime" : "Log In to Buy" }}
                           </v-btn>
                         </v-card-actions>
@@ -89,7 +89,7 @@
                         <p>Unlimited access to all content.</p>
                       </v-card-text>
                       <v-card-actions>
-                        <v-btn color="primary" @click.stop="handleSubscriptionClick('monthly')">
+                        <v-btn :loading="loadingMonthly" color="primary" @click.stop="handleSubscriptionClick('monthly')">
                           {{ isAuthenticated ? "Subscribe" : "Log In to Subscribe" }}
                         </v-btn>
                       </v-card-actions>
@@ -112,7 +112,7 @@
                         <p>Unlimited lifetime access to all content.</p>
                       </v-card-text>
                       <v-card-actions>
-                        <v-btn color="primary" @click.stop="handleSubscriptionClick('lifetime')">
+                        <v-btn :loading="loadingLifetime" color="primary" @click.stop="handleSubscriptionClick('lifetime')">
                           {{ isAuthenticated ? "Buy Lifetime" : "Log In to Buy" }}
                         </v-btn>
                       </v-card-actions>
@@ -156,6 +156,11 @@ const router = useRouter();
 const loginModal = ref(null);
 const pendingCheckoutType = ref(null);
 
+// loading states for buttons
+const loadingManage = ref(false);
+const loadingMonthly = ref(false);
+const loadingLifetime = ref(false);
+
 function openLoginModal() {
   if (loginModal.value && loginModal.value.open) {
     loginModal.value.open();
@@ -171,8 +176,27 @@ function handleSubscriptionClick(type) {
   }
 }
 
-function startCheckoutByType(type) {
-  startCheckout(type);
+async function startCheckoutByType(type) {
+  if (type === 'monthly') loadingMonthly.value = true;
+  else loadingLifetime.value = true;
+
+  try {
+    await startCheckout(type);
+  } catch (err) {
+    if (type === 'monthly') loadingMonthly.value = false;
+    else loadingLifetime.value = false;
+    throw err;
+  }
+}
+
+async function handleManageSubscription() {
+  loadingManage.value = true;
+  try {
+    await manageSubscription();
+  } catch (err) {
+    loadingManage.value = false;
+    throw err;
+  }
 }
 
 const formatDate = (timestamp) => {

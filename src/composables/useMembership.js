@@ -2,6 +2,7 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp } from "../config/firebaseConfig";
 import { storeToRefs } from "pinia";
 import { useAuthStore } from '../composables/useAuth';
+import { showNotification } from '@/composables/useNotifier';
 
 export default function useMembership() {
   const authStore = useAuthStore();
@@ -27,7 +28,9 @@ export default function useMembership() {
       window.location.href = result.data.url;
     } catch (error) {
       console.error("Error starting checkout:", error);
-      throw new Error("Failed to start checkout session");
+      const msg = error?.message || 'Failed to start checkout session';
+      try { showNotification(msg, 'warning', 10000); } catch (e) {}
+      throw new Error(msg);
     }
   }
 
@@ -47,7 +50,9 @@ export default function useMembership() {
       window.location.href = result.data.url;
     } catch (error) {
       console.error("Error managing subscription:", error);
-      throw new Error("Failed to manage subscription");
+      const msg = error?.message || "Failed to manage subscription";
+      try { showNotification(msg, 'warning', 10000); } catch (e) {}
+      throw new Error(msg);
     }
   }
 

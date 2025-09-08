@@ -201,12 +201,24 @@
               </v-chip>
               <span v-else>-</span>
             </template>
+            <template v-slot:item.customerId="{ item }">
+              <code v-if="item.customerId">{{ item.customerId }}</code>
+              <span v-else class="text-grey">-</span>
+            </template>
             <template v-slot:item.subscriptionId="{ item }">
               <code v-if="item.subscriptionId">{{ item.subscriptionId }}</code>
               <span v-else class="text-grey">-</span>
             </template>
             <template v-slot:item.cancelAt="{ item }">
               <span v-if="item.cancelAt">{{ formatDate(item.cancelAt) }}</span>
+              <span v-else>-</span>
+            </template>
+            <template v-slot:item.cancelTime="{ item }">
+              <span v-if="item.cancelTime">{{ formatDate(item.cancelTime) }}</span>
+              <span v-else>-</span>
+            </template>
+            <template v-slot:item.resumeTime="{ item }">
+              <span v-if="item.resumeTime">{{ formatDate(item.resumeTime) }}</span>
               <span v-else>-</span>
             </template>
           </v-data-table>
@@ -294,17 +306,96 @@
           </v-data-table>
         </v-card>
       </v-col>
+
+      <!-- Function Error Logs Table -->
+      <v-col cols="12" class="mt-4">
+        <v-card elevation="2">
+          <v-card-title class="text-h6">
+            <v-icon left color="error">mdi-bug</v-icon>
+            Error Logs ({{ filteredErrorLogs.length }})
+            <v-spacer></v-spacer>
+            <v-text-field
+              v-model="errorSearch"
+              append-icon="mdi-magnify"
+              label="Search errors..."
+              single-line
+              hide-details
+              density="compact"
+              style="max-width: 300px;"
+            ></v-text-field>
+          </v-card-title>
+          <v-data-table
+            :headers="errorHeaders"
+            :items="filteredErrorLogs"
+            :search="errorSearch"
+            :items-per-page="15"
+            @click:row="onRowClick"
+            class="elevation-1"
+          >
+            <template v-slot:item.timestamp="{ item }">
+              {{ formatDate(item.lastSeen || item.timestamp) }}
+            </template>
+            <template v-slot:item.functionName="{ item }">
+              <v-chip color="primary" size="small">{{ item.functionName }}</v-chip>
+            </template>
+            <template v-slot:item.bucket="{ item }">
+              <v-chip size="small" :color="item.bucket === 'stripe' ? 'error' : 'grey'">{{ item.bucket || 'generic' }}</v-chip>
+            </template>
+            <template v-slot:item.message="{ item }">
+              <span>
+                {{ (item.message || '').slice(0, 120) }}
+                <span v-if="(item.message||'').length>120">...</span>
+              </span>
+            </template>
+            <template v-slot:item.authUid="{ item }">
+              <code v-if="item.authUid">{{ item.authUid }}</code>
+              <span v-else class="text-grey">-</span>
+            </template>
+            <template v-slot:item.ip="{ item }">
+              <code>{{ item.ip || 'Unknown' }}</code>
+            </template>
+            <template v-slot:item.occurrences="{ item }">
+              <v-chip size="small">{{ item.occurrences || 1 }}</v-chip>
+            </template>
+          </v-data-table>
+        </v-card>
+      </v-col>
     </v-row>
 
-    <!-- Snackbar for notifications -->
-    <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000">
-      {{ snackbar.message }}
-      <template #actions>
-        <v-btn color="white" variant="text" @click="snackbar.show = false">
-          Close
-        </v-btn>
-      </template>
-    </v-snackbar>
+    <!-- Error Details Dialog -->
+    <v-dialog v-model="errorDialog.show" max-width="1200px">
+      <v-card>
+        <v-card-title class="d-flex">
+          <span class="d-flex align-center">Error Details</span>
+          <v-spacer></v-spacer>
+          <v-btn color="primary" size="small" variant="outlined" icon="mdi-close" @click="errorDialog.show = false" />
+        </v-card-title>
+        <v-card-text>
+          <div v-if="errorDialog.item">
+            <p><strong>Function:</strong> {{ errorDialog.item.functionName }}</p>
+            <p><strong>Bucket:</strong> {{ errorDialog.item.bucket || 'generic' }}</p>
+            <p><strong>User-friendly:</strong> <em>{{ errorDialog.item.humanMessage || '-' }}</em></p>
+            <p><strong>Message:</strong> <code>{{ errorDialog.item.message }}</code></p>
+            <p><strong>First Seen:</strong> {{ formatDate(errorDialog.item.firstSeen) }}</p>
+            <p><strong>Last Seen:</strong> {{ formatDate(errorDialog.item.lastSeen) }}</p>
+            <p><strong>Occurrences:</strong> {{ errorDialog.item.occurrences }}</p>
+            <p><strong>Auth User UUID:</strong> {{ errorDialog.item.authUid || '-' }}</p>
+            <p><strong>IP:</strong> {{ errorDialog.item.ip || '-' }}</p>
+            <p><strong>Request Data:</strong></p>
+            <pre style="white-space:pre-wrap">{{ errorDialog.item.requestData || '-' }}</pre>
+            <p><strong>Stack:</strong></p>
+            <pre style="white-space:pre-wrap">{{ errorDialog.item.stack || '-' }}</pre>
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="primary" text @click="errorDialog.show = false">
+            <v-icon left>mdi-close</v-icon>
+            Close
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -314,6 +405,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useAuthStore } from '@/composables/useAuth';
 import { storeToRefs } from 'pinia';
 import { firebaseApp } from '@/config/firebaseConfig';
+import { showNotification } from '@/composables/useNotifier';
 
 const authStore = useAuthStore();
 const { isAdmin } = storeToRefs(authStore);
@@ -326,21 +418,18 @@ const lastUpdated = ref(null);
 const memberSearch = ref('');
 const rateLimitSearch = ref('');
 
-const snackbar = ref({
-  show: false,
-  message: '',
-  color: 'success'
-});
 
 // Table headers
 const memberHeaders = [
   { title: 'User ID', key: 'id', sortable: true },
   { title: 'Status', key: 'member', sortable: true },
   { title: 'Role', key: 'admin', sortable: true },
+  { title: 'Customer ID', key: 'customerId', sortable: true },
   { title: 'Subscription', key: 'subscriptionType', sortable: true },
   { title: 'Subscription ID', key: 'subscriptionId', sortable: true },
-  { title: 'Cancel Date', key: 'cancelAt', sortable: true },
-  { title: 'Customer ID', key: 'customerId', sortable: true }
+  { title: 'Cancel Date', key: 'cancelTime', sortable: true },
+  { title: 'Cancel At Date', key: 'cancelAt', sortable: true },
+  { title: 'Resume Date', key: 'resumeTime', sortable: true }
 ];
 
 const rateLimitHeaders = [
@@ -349,6 +438,16 @@ const rateLimitHeaders = [
   { title: 'User ID', key: 'uid', sortable: true },
   { title: 'IP Address', key: 'ip', sortable: true },
   { title: 'Qualifier', key: 'qualifier', sortable: true }
+];
+
+const errorHeaders = [
+  { title: 'Timestamp', key: 'timestamp', sortable: true },
+  { title: 'Function', key: 'functionName', sortable: true },
+  { title: 'Message', key: 'message', sortable: false },
+  { title: 'Bucket', key: 'bucket', sortable: true },
+  { title: 'User UUID', key: 'authUid', sortable: true },
+  { title: 'IP', key: 'ip', sortable: true },
+  { title: 'Occurrences', key: 'occurrences', sortable: true },
 ];
 
 const usersHeaders = [
@@ -370,6 +469,40 @@ const filteredRateLimitLogs = computed(() => {
   return adminData.value.rateLimitLogs;
 });
 
+const errorSearch = ref('');
+const filteredErrorLogs = computed(() => {
+  if (!adminData.value) return [];
+  return adminData.value.errorLogs || [];
+});
+
+const errorDialog = ref({ show: false, item: null });
+
+function showErrorDetails(item) {
+  errorDialog.value.item = item;
+  errorDialog.value.show = true;
+}
+
+function onRowClick(...args) {
+  const payload = args.length === 1 ? args[0] : args[1];
+  if (!payload) return;
+
+  let row = payload;
+  if (payload.item) {
+    row = payload.item;
+  } else if (payload.raw) {
+    row = payload.raw;
+  } else if (payload.internalItem && payload.internalItem.raw) {
+    row = payload.internalItem.raw;
+  }
+
+  if (row && row.value && Array.isArray(filteredErrorLogs.value)) {
+    const found = filteredErrorLogs.value.find((r) => r.id === row.value || r.id === row.key);
+    if (found) row = found;
+  }
+
+  if (row) showErrorDetails(row);
+}
+
 const usersSearch = ref('');
 const filteredUsers = computed(() => {
   if (!adminData.value) return [];
@@ -377,17 +510,32 @@ const filteredUsers = computed(() => {
 });
 
 // Methods
-function showNotification(message, color = 'success') {
-  snackbar.value = {
-    show: true,
-    message,
-    color
-  };
-}
 
-function formatDate(dateString) {
-  if (!dateString) return '-';
-  return new Date(dateString).toLocaleString();
+function formatDate(val) {
+  if (!val) return '-';
+
+  // Firestore Timestamp (client SDK)
+  if (typeof val === 'object' && typeof val.toDate === 'function') {
+    return val.toDate().toLocaleString();
+  }
+
+  // Admin SDK / serialized Timestamp object
+  if (typeof val === 'object' && (('seconds' in val) || ('_seconds' in val))) {
+    const secs = ('seconds' in val) ? val.seconds : val._seconds;
+    const nanos = ('nanoseconds' in val) ? val.nanoseconds : (val._nanoseconds ?? 0);
+    const ms = secs * 1000 + Math.floor(nanos / 1e6);
+    return new Date(ms).toLocaleString();
+  }
+
+  // Numeric epoch (seconds or ms)
+  if (typeof val === 'number') {
+    const ms = val < 1e12 ? val * 1000 : val;
+    return new Date(ms).toLocaleString();
+  }
+
+  // String/Date-compatible
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? '-' : d.toLocaleString();
 }
 
 function getSubscriptionColor(subscriptionType) {
@@ -407,7 +555,7 @@ async function fetchAdminData() {
     adminData.value = result.data;
     lastUpdated.value = result.data.timestamp;
     
-    showNotification('Admin data loaded successfully');
+    showNotification('Admin data loaded successfully', 'success');
   } catch (error) {
     console.error('Error fetching admin data:', error);
     showNotification('Error loading admin data: ' + error.message, 'error');

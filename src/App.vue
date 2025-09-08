@@ -3,6 +3,7 @@
     <div class="app-container">
       <NavBar />
       <RateLimitBanner :show="rateLimitBanner" />
+      <GlobalSnackbar />
       <v-main class="main-content">
         <router-view />
       </v-main>
@@ -15,6 +16,7 @@
 import NavBar from './components/nav.vue';
 import Footer from './components/footer.vue';
 import RateLimitBanner from './components/RateLimitBanner.vue';
+import GlobalSnackbar from './components/GlobalSnackbar.vue';
 import { rateLimitBanner } from './composables/useRateLimitBanner';
 </script>
 
