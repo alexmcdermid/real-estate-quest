@@ -161,18 +161,23 @@
       <v-col cols="12">
         <v-card elevation="2">
           <v-card-title class="text-h6">
-            <v-icon left color="primary">mdi-account-group</v-icon>
-            Members ({{ filteredMembers.length }})
-            <v-spacer></v-spacer>
-            <v-text-field
-              v-model="memberSearch"
-              append-icon="mdi-magnify"
-              label="Search members..."
-              single-line
-              hide-details
-              density="compact"
-              style="max-width: 300px;"
-            ></v-text-field>
+            <div style="display:flex; align-items:center; width:100%;">
+              <div style="display:flex; align-items:center; flex:1;">
+                <v-icon left color="primary">mdi-account-group</v-icon>
+                <span>Members ({{ filteredMembers.length }})</span>
+              </div>
+              <div style="flex-shrink:0;">
+                <v-text-field
+                  v-model="memberSearch"
+                  append-icon="mdi-magnify"
+                  label="Search members..."
+                  single-line
+                  hide-details
+                  density="compact"
+                  class="admin-search"
+                ></v-text-field>
+              </div>
+            </div>
           </v-card-title>
           <v-data-table
             :headers="memberHeaders"
@@ -209,6 +214,10 @@
               <code v-if="item.subscriptionId">{{ item.subscriptionId }}</code>
               <span v-else class="text-grey">-</span>
             </template>
+            <template v-slot:item.subscriptionStart="{ item }">
+              <span v-if="item.subscriptionStart">{{ formatDate(item.subscriptionStart) }}</span>
+              <span v-else>-</span>
+            </template>
             <template v-slot:item.cancelAt="{ item }">
               <span v-if="item.cancelAt">{{ formatDate(item.cancelAt) }}</span>
               <span v-else>-</span>
@@ -229,18 +238,23 @@
       <v-col cols="12" class="mt-4">
         <v-card elevation="2">
           <v-card-title class="text-h6">
-            <v-icon left color="primary">mdi-account-multiple</v-icon>
-            All Users ({{ adminData.users ? adminData.users.length : 0 }})
-            <v-spacer></v-spacer>
-            <v-text-field
-              v-model="usersSearch"
-              append-icon="mdi-magnify"
-              label="Search users..."
-              single-line
-              hide-details
-              density="compact"
-              style="max-width: 300px;"
-            ></v-text-field>
+            <div style="display:flex; align-items:center; width:100%;">
+              <div style="display:flex; align-items:center; flex:1;">
+                <v-icon left color="primary">mdi-account-multiple</v-icon>
+                <span>All Users ({{ adminData.users ? adminData.users.length : 0 }})</span>
+              </div>
+              <div style="flex-shrink:0;">
+                <v-text-field
+                  v-model="usersSearch"
+                  append-icon="mdi-magnify"
+                  label="Search users..."
+                  single-line
+                  hide-details
+                  density="compact"
+                  class="admin-search"
+                ></v-text-field>
+              </div>
+            </div>
           </v-card-title>
           <v-data-table
             :headers="usersHeaders"
@@ -265,18 +279,23 @@
       <v-col cols="12" class="mt-4">
         <v-card elevation="2">
           <v-card-title class="text-h6">
-            <v-icon left color="warning">mdi-shield-alert</v-icon>
-            Rate Limit Logs ({{ filteredRateLimitLogs.length }})
-            <v-spacer></v-spacer>
-            <v-text-field
-              v-model="rateLimitSearch"
-              append-icon="mdi-magnify"
-              label="Search logs..."
-              single-line
-              hide-details
-              density="compact"
-              style="max-width: 300px;"
-            ></v-text-field>
+            <div style="display:flex; align-items:center; width:100%;">
+              <div style="display:flex; align-items:center; flex:1;">
+                <v-icon left color="warning">mdi-shield-alert</v-icon>
+                <span>Rate Limit Logs ({{ filteredRateLimitLogs.length }})</span>
+              </div>
+              <div style="flex-shrink:0;">
+                <v-text-field
+                  v-model="rateLimitSearch"
+                  append-icon="mdi-magnify"
+                  label="Search logs..."
+                  single-line
+                  hide-details
+                  density="compact"
+                  class="admin-search"
+                ></v-text-field>
+              </div>
+            </div>
           </v-card-title>
           <v-data-table
             :headers="rateLimitHeaders"
@@ -311,18 +330,23 @@
       <v-col cols="12" class="mt-4">
         <v-card elevation="2">
           <v-card-title class="text-h6">
-            <v-icon left color="error">mdi-bug</v-icon>
-            Error Logs ({{ filteredErrorLogs.length }})
-            <v-spacer></v-spacer>
-            <v-text-field
-              v-model="errorSearch"
-              append-icon="mdi-magnify"
-              label="Search errors..."
-              single-line
-              hide-details
-              density="compact"
-              style="max-width: 300px;"
-            ></v-text-field>
+            <div style="display:flex; align-items:center; width:100%;">
+              <div style="display:flex; align-items:center; flex:1;">
+                <v-icon left color="error">mdi-bug</v-icon>
+                <span>Error Logs ({{ filteredErrorLogs.length }})</span>
+              </div>
+              <div style="flex-shrink:0;">
+                <v-text-field
+                  v-model="errorSearch"
+                  append-icon="mdi-magnify"
+                  label="Search errors..."
+                  single-line
+                  hide-details
+                  density="compact"
+                  class="admin-search"
+                ></v-text-field>
+              </div>
+            </div>
           </v-card-title>
           <v-data-table
             :headers="errorHeaders"
@@ -427,6 +451,7 @@ const memberHeaders = [
   { title: 'Customer ID', key: 'customerId', sortable: true },
   { title: 'Subscription', key: 'subscriptionType', sortable: true },
   { title: 'Subscription ID', key: 'subscriptionId', sortable: true },
+  { title: 'Start Date', key: 'subscriptionStart', sortable: true },
   { title: 'Cancel Date', key: 'cancelTime', sortable: true },
   { title: 'Cancel At Date', key: 'cancelAt', sortable: true },
   { title: 'Resume Date', key: 'resumeTime', sortable: true }
@@ -626,5 +651,17 @@ code {
 
 .text-grey {
   color: #666;
+}
+
+.admin-search {
+  width: 100%;
+  min-width: 180px;
+  max-width: 420px;
+}
+
+@media (min-width: 1024px) {
+  .admin-search {
+    width: 320px;
+  }
 }
 </style>

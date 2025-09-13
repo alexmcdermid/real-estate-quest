@@ -772,6 +772,7 @@ export const handleStripeWebhook = onRequest(
                     subscriptionId: subscriptionId,
                     customerId: customerId,
                     subscriptionType: subscriptionType,
+                    subscriptionStart: admin.firestore.FieldValue.serverTimestamp(),
                   },
                   {merge: true},
               );
@@ -802,6 +803,10 @@ export const handleStripeWebhook = onRequest(
                 }
               }
 
+              const subscriptionStart = (userData && userData.subscriptionStart) ?
+              userData.subscriptionStart :
+              admin.firestore.FieldValue.serverTimestamp();
+
               await userDocRef.set(
                   {
                     customerId: customerId,
@@ -809,6 +814,7 @@ export const handleStripeWebhook = onRequest(
                     subscriptionType: subscriptionType,
                     cancelAt: admin.firestore.FieldValue.delete(),
                     member: true,
+                    subscriptionStart: subscriptionStart,
                   },
                   {merge: true},
               );
