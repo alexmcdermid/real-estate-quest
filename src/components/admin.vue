@@ -214,6 +214,10 @@
               <code v-if="item.subscriptionId">{{ item.subscriptionId }}</code>
               <span v-else class="text-grey">-</span>
             </template>
+            <template v-slot:item.subscriptionStart="{ item }">
+              <span v-if="item.subscriptionStart">{{ formatDate(item.subscriptionStart) }}</span>
+              <span v-else>-</span>
+            </template>
             <template v-slot:item.cancelAt="{ item }">
               <span v-if="item.cancelAt">{{ formatDate(item.cancelAt) }}</span>
               <span v-else>-</span>
@@ -447,6 +451,7 @@ const memberHeaders = [
   { title: 'Customer ID', key: 'customerId', sortable: true },
   { title: 'Subscription', key: 'subscriptionType', sortable: true },
   { title: 'Subscription ID', key: 'subscriptionId', sortable: true },
+  { title: 'Start Date', key: 'subscriptionStart', sortable: true },
   { title: 'Cancel Date', key: 'cancelTime', sortable: true },
   { title: 'Cancel At Date', key: 'cancelAt', sortable: true },
   { title: 'Resume Date', key: 'resumeTime', sortable: true }
