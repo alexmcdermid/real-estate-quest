@@ -50,12 +50,9 @@ export async function preloadContent() {
     if (cacheStatus.hasCache && cacheStatus.newestTimestamp) {
       const cacheAge = Date.now() - cacheStatus.newestTimestamp;
       if (cacheAge < STALE_TIME) {
-        console.log('Content cache is fresh, skipping preload');
         return;
       }
     }
-
-    console.log('Initiating content preload...');
 
     const functions = getFunctions(firebaseApp, "us-west1");
     const preloadContentCallable = httpsCallable(functions, "preloadContent");
@@ -92,7 +89,6 @@ export async function preloadContent() {
     const totalQuestions = Object.values(result.data.questions).reduce((sum, arr) => sum + arr.length, 0);
     const totalFlashcards = Object.values(result.data.flashcards).reduce((sum, arr) => sum + arr.length, 0);
     const chapterCount = Object.keys(result.data.questions).length;
-    console.log(`Preload complete! Cached ${totalQuestions} questions and ${totalFlashcards} flashcards across ${chapterCount} chapters.`);
   } catch (error) {
     if (
       error?.code === 'resource-exhausted' ||
