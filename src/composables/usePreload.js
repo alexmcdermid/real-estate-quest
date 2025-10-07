@@ -104,7 +104,6 @@ export async function preloadContent() {
     }
     // Silently fail - preloading is a nice-to-have, not critical
     console.warn('Error during content preload:', error);
-    showNotification('Failed to preload content. Content will load when you navigate to it.', 'warning', 3000);
   }
 }
 
