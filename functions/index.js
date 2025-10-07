@@ -479,7 +479,8 @@ export const preloadContent = onCall(
             return flashcardData;
           });
 
-          console.log(`Preloaded chapter ${chapter}: ${result.questions[chapter].length} questions, ${result.flashcards[chapter].length} flashcards`);
+          console.log(`Preloaded chapter ${chapter}: ${result.questions[chapter].length} 
+            questions, ${result.flashcards[chapter].length} flashcards`);
         } catch (error) {
           console.error(`Error preloading chapter ${chapter}:`, error);
           result.questions[chapter] = [];
