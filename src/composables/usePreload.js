@@ -85,10 +85,6 @@ export async function preloadContent() {
 
     // Save updated cache
     localStorage.setItem(CACHE_KEY, encodeCache(cache));
-    
-    const totalQuestions = Object.values(result.data.questions).reduce((sum, arr) => sum + arr.length, 0);
-    const totalFlashcards = Object.values(result.data.flashcards).reduce((sum, arr) => sum + arr.length, 0);
-    const chapterCount = Object.keys(result.data.questions).length;
   } catch (error) {
     if (
       error?.code === 'resource-exhausted' ||
