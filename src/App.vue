@@ -13,11 +13,17 @@
 </template>
 
 <script setup>
+import { onMounted } from 'vue';
 import NavBar from './components/nav.vue';
 import Footer from './components/footer.vue';
 import RateLimitBanner from './components/RateLimitBanner.vue';
 import GlobalSnackbar from './components/GlobalSnackbar.vue';
 import { rateLimitBanner } from './composables/useRateLimitBanner';
+import { initPreload } from './composables/usePreload';
+
+onMounted(() => {
+  initPreload();
+});
 </script>
 
 <style scoped>

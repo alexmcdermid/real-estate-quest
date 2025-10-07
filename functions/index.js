@@ -387,6 +387,115 @@ export const getFlashCardsByChapter = onCall(
     },
 );
 
+export const preloadContent = onCall(
+    {
+      region: "us-west1",
+      enforceAppCheck: true,
+    },
+    async (request) => {
+      const qualifier = request.auth?.uid? `u_${request.auth.uid}`: request.rawRequest.ip;
+      const limiter = request.auth?.uid ? authLimiter : unauthLimiter;
+      try {
+        await limiter.rejectOnQuotaExceededOrRecordUsage(qualifier);
+      } catch (err) {
+        try {
+          await db.collection("rate_limit_logs").add({
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            type: "preload",
+            qualifier,
+            uid: request.auth?.uid || null,
+            ip: request.rawRequest.ip || null,
+            userAgent: request.rawRequest.headers["user-agent"] || null,
+          });
+        } catch (logErr) {
+          console.error("Failed to log rate limit event (preload):", logErr);
+        }
+        throw new HttpsError(
+            "resource-exhausted",
+            "Too many requests – please try again in a minute.",
+        );
+      }
+
+      console.log("is prod", isProduction);
+      let isPremium = false;
+      const authContext = request.auth;
+
+      if (authContext && authContext.uid) {
+        const proStatus = authContext.token?.proStatus;
+        const member = authContext.token?.member;
+        console.log(`User ${authContext.uid} - checking member claim: '${member}' - checking proStatus claim: '${proStatus}'`);
+
+        if (member === true && (proStatus === "Monthly" || proStatus === "Lifetime")) {
+          isPremium = true;
+          console.log(`User ${authContext.uid} IS premium.`);
+        } else {
+          isPremium = false;
+          console.log(`User ${authContext.uid} is NOT premium.`);
+        }
+      } else {
+        console.log("No authenticated user detected in context.");
+        isPremium = false;
+      }
+
+      const chaptersToPreload = [1, 2, 3];
+      console.log(`Preloading content for chapters: ${chaptersToPreload.join(", ")} (Premium: ${isPremium})`);
+
+      const result = {
+        questions: {},
+        flashcards: {},
+      };
+
+      for (const chapter of chaptersToPreload) {
+        try {
+          let questionsQuery = db.collection("questions")
+              .where("chapter", "==", chapter);
+
+          if (!isPremium) {
+            questionsQuery = questionsQuery.where("premium", "==", false).orderBy("questionNumber");
+          } else {
+            questionsQuery = questionsQuery.orderBy("questionNumber");
+          }
+
+          const questionsSnapshot = await questionsQuery.get();
+          result.questions[chapter] = questionsSnapshot.docs.map((doc) => {
+            const questionData = doc.data();
+            questionData.id = doc.id;
+            return questionData;
+          });
+
+          let flashcardsQuery = db.collection("flashcards")
+              .where("chapter", "==", chapter);
+
+          if (!isPremium) {
+            flashcardsQuery = flashcardsQuery.where("premium", "==", false).orderBy("cardNumber");
+          } else {
+            flashcardsQuery = flashcardsQuery.orderBy("cardNumber");
+          }
+
+          const flashcardsSnapshot = await flashcardsQuery.get();
+          result.flashcards[chapter] = flashcardsSnapshot.docs.map((doc) => {
+            const flashcardData = doc.data();
+            flashcardData.id = doc.id;
+            return flashcardData;
+          });
+
+          console.log(`Preloaded chapter ${chapter}: ${result.questions[chapter].length} 
+            questions, ${result.flashcards[chapter].length} flashcards`);
+        } catch (error) {
+          console.error(`Error preloading chapter ${chapter}:`, error);
+          result.questions[chapter] = [];
+          result.flashcards[chapter] = [];
+        }
+      }
+
+      const totalQuestions = Object.values(result.questions).reduce((sum, arr) => sum + arr.length, 0);
+      const totalFlashcards = Object.values(result.flashcards).reduce((sum, arr) => sum + arr.length, 0);
+      console.log(`Preload complete: ${totalQuestions} total questions, ${totalFlashcards} total flashcards`);
+
+      return result;
+    },
+);
+
 export const importFlashCardsFromRepo = onSchedule(
     {
       schedule: "0 1 * * *", // Run at 1:00 AM daily (1 hour after questions import)
