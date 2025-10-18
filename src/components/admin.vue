@@ -425,20 +425,17 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useAuthStore } from '@/composables/useAuth';
+import { useAdminStore } from '@/composables/useAdmin';
 import { storeToRefs } from 'pinia';
-import { firebaseApp } from '@/config/firebaseConfig';
 import { showNotification } from '@/composables/useNotifier';
 
 const authStore = useAuthStore();
 const { isAdmin } = storeToRefs(authStore);
-const functions = getFunctions(firebaseApp, 'us-west1');
 
-// Reactive data
-const adminData = ref(null);
-const loading = ref(false);
-const lastUpdated = ref(null);
+const adminStore = useAdminStore();
+const { adminData, loading, lastUpdated } = storeToRefs(adminStore);
+
 const memberSearch = ref('');
 const rateLimitSearch = ref('');
 
@@ -571,26 +568,8 @@ function getSubscriptionColor(subscriptionType) {
   }
 }
 
-async function fetchAdminData() {
-  loading.value = true;
-  try {
-    const getAdminData = httpsCallable(functions, 'getAdminData');
-    const result = await getAdminData();
-    
-    adminData.value = result.data;
-    lastUpdated.value = result.data.timestamp;
-    
-    showNotification('Admin data loaded successfully', 'success');
-  } catch (error) {
-    console.error('Error fetching admin data:', error);
-    showNotification('Error loading admin data: ' + error.message, 'error');
-  } finally {
-    loading.value = false;
-  }
-}
-
 async function refreshData() {
-  await fetchAdminData();
+  await adminStore.refreshData();
 }
 
 function exportData() {
@@ -609,16 +588,13 @@ function exportData() {
   showNotification('Data exported successfully');
 }
 
-// Initialize component
 onMounted(async () => {
-  // Check if user is actually admin
   if (!isAdmin.value) {
     showNotification('Access denied: Admin privileges required', 'error');
     return;
   }
 
-  // Load initial data
-  await fetchAdminData();
+  await adminStore.fetchAdminData();
 });
 </script>
 
