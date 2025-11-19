@@ -118,6 +118,16 @@ router.beforeEach((to, from, next) => {
       metaDescription.setAttribute('content', to.meta.description);
     }
   }
+
+  let canonicalLink = document.querySelector('link[rel="canonical"]');
+  if (canonicalLink) {
+    canonicalLink.setAttribute('href', `https://bcrealestatequest.ca${to.path}`);
+  } else {
+    canonicalLink = document.createElement('link');
+    canonicalLink.setAttribute('rel', 'canonical');
+    canonicalLink.setAttribute('href', `https://bcrealestatequest.ca${to.path}`);
+    document.head.appendChild(canonicalLink);
+  }
   
   // Handle noindex meta tag
   let metaRobots = document.querySelector('meta[name="robots"]');
