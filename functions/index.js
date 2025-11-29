@@ -68,6 +68,7 @@ const db = admin.firestore();
 
 const unauthLimiter = new SimpleRateLimiter("unauth_rate_limiter", 40, 60, db);
 const authLimiter = new SimpleRateLimiter("user_rate_limiter", 40, 60, db);
+const activityLimiter = new SimpleRateLimiter("activity_rate_limiter", 120, 60, db);
 
 const stripeSecretKeyDev = defineSecret("STRIPE_SECRET_KEY_DEV");
 const stripeWebhookSecretDev = defineSecret("STRIPE_WEBHOOK_SECRET_DEV");
@@ -221,6 +222,106 @@ function payloadIsStripeError(err, meta) {
   if (fn.includes("stripe") || fn.includes("checkout") || fn.includes("billing")) return true;
   return false;
 }
+
+export const logStudyActivity = onCall(
+    {
+      region: "us-west1",
+      enforceAppCheck: true,
+    },
+    async (request) => {
+      const qualifier = request.auth?.uid ? `u_${request.auth.uid}` : request.rawRequest.ip || "anon";
+      try {
+        await activityLimiter.rejectOnQuotaExceededOrRecordUsage(qualifier);
+      } catch (err) {
+        try {
+          await db.collection("rate_limit_logs").add({
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            type: "activity",
+            qualifier,
+            uid: request.auth?.uid || null,
+            ip: request.rawRequest?.ip || null,
+            userAgent: request.rawRequest?.headers?.["user-agent"] || null,
+          });
+        } catch (logErr) {
+          console.error("Failed to log rate limit event (activity):", logErr);
+        }
+        throw new HttpsError(
+            "resource-exhausted",
+            "Too many events – please try again in a moment.",
+        );
+      }
+
+      const incomingEvents = Array.isArray(request.data?.events) ?
+        request.data.events.slice(0, 20) : [];
+
+      if (incomingEvents.length === 0) {
+        throw new HttpsError("invalid-argument", "events array with at least one entry is required.");
+      }
+
+      const allowedTypes = new Set(["question", "flashcard"]);
+      const sanitizedEvents = [];
+
+      for (const raw of incomingEvents) {
+        if (!raw || typeof raw !== "object") continue;
+
+        const type = typeof raw.type === "string" ? raw.type.toLowerCase() : "";
+        if (!allowedTypes.has(type)) continue;
+
+        const chapter = Number(raw.chapter);
+        const itemNumber = Number(raw.itemNumber);
+        const event = {
+          type,
+          action: typeof raw.action === "string" ? raw.action.slice(0, 32) : "unknown",
+          chapter: Number.isFinite(chapter) ? chapter : null,
+          itemNumber: Number.isFinite(itemNumber) ? itemNumber : null,
+          isCorrect: typeof raw.isCorrect === "boolean" ? raw.isCorrect : null,
+          selectedChoice: Number.isFinite(raw.selectedChoice) ? raw.selectedChoice : null,
+          difficulty: typeof raw.difficulty === "string" ? raw.difficulty.slice(0, 32) : null,
+          clientTs: typeof raw.clientTs === "number" ? raw.clientTs : null,
+          isPremiumContent: raw.isPremiumContent === true,
+          isProUser: raw.isProUser === true,
+        };
+
+        sanitizedEvents.push(event);
+      }
+
+      if (sanitizedEvents.length === 0) {
+        throw new HttpsError("invalid-argument", "No valid events were provided.");
+      }
+
+      const questionCount = sanitizedEvents.filter((e) => e.type === "question").length;
+      const flashcardCount = sanitizedEvents.filter((e) => e.type === "flashcard").length;
+      const visitorId = typeof request.data?.visitorId === "string" ?
+        request.data.visitorId.slice(0, 120) : null;
+
+      try {
+        await db.collection("study_activity_logs").add({
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          env: process.env.NODE_ENV || "unknown",
+          uid: request.auth?.uid || null,
+          visitorId: visitorId || null,
+          ip: request.rawRequest?.ip || null,
+          userAgent: request.rawRequest?.headers?.["user-agent"] || null,
+          counts: {
+            questions: questionCount,
+            flashcards: flashcardCount,
+          },
+          events: sanitizedEvents,
+        });
+
+        return {success: true, stored: sanitizedEvents.length};
+      } catch (error) {
+        await logFunctionError(error, {
+          functionName: "logStudyActivity",
+          uid: request.auth?.uid || null,
+          ip: request.rawRequest?.ip || null,
+          requestData: {eventCount: sanitizedEvents.length},
+          severity: "error",
+        });
+        throw new HttpsError("internal", "Failed to record activity");
+      }
+    },
+);
 
 export const getQuestionsByChapter = onCall(
     {

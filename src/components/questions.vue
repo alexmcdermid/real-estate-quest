@@ -50,13 +50,13 @@
               cols="12"
               md="6"
             >
-              <component
-                :is="item.component"
-                v-bind="item.props"
-                proType="questions"
-                @questionCompleted="markQuestionCompleted(index)"
-                @questionReset="markQuestionReset(index)"
-              />
+            <component
+              :is="item.component"
+              v-bind="item.props"
+              proType="questions"
+              @questionCompleted="markQuestionCompleted"
+              @questionReset="markQuestionReset"
+            />
             </v-col>
             <template v-if="!isPro && questions.length > 0">
               <v-col
@@ -102,7 +102,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, computed } from "vue";
+import { ref, watch, onMounted, onBeforeUnmount, computed } from "vue";
 import { useAuthStore } from "../composables/useAuth";
 import { storeToRefs } from "pinia";
 import { useRoute, useRouter } from "vue-router";
@@ -113,11 +113,13 @@ import ProCard from "./proCard.vue";
 import BlurredCtaCard from "./BlurredCtaCard.vue";
 import useOptions from "../composables/useOption";
 import { chapters } from "@/constants/chapters";
+import { useActivityTracker } from "../composables/useActivityTracker";
 
 const authStore = useAuthStore();
 const { authInitialized, isPro } = storeToRefs(authStore);
 
 const { options } = useOptions();
+const { recordQuestionAnswer, flushPendingEvents } = useActivityTracker();
 
 const isLoading = ref(true);
 const selectedChapter = ref(1);
@@ -153,8 +155,22 @@ const questionsWithProCard = computed(() => {
 
 const hasCompletedQuestions = computed(() => completedQuestions.value.size > 0);
 
-function markQuestionCompleted(index) {
+function markQuestionCompleted(payload) {
+  const index = typeof payload === "object" ? payload.index : payload;
+  if (typeof index !== "number") return;
+
   completedQuestions.value.add(index);
+
+  const question = questions.value[index];
+  if (question) {
+    recordQuestionAnswer({
+      question,
+      chapter: selectedChapter.value,
+      isCorrect: payload?.isCorrect,
+      selectedChoice: payload?.selectedChoice,
+      isProUser: isPro.value,
+    });
+  }
 }
 
 function markQuestionReset(index) {
@@ -209,6 +225,10 @@ onMounted(() => {
       }
     });
   }
+});
+
+onBeforeUnmount(() => {
+  flushPendingEvents(true);
 });
 
 function shuffleArray(array) {

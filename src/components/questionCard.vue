@@ -100,8 +100,13 @@ watch(() => props.resetAll, (newVal) => {
 
 // Submit the answer.
 function submitAnswer() {
+  const correct = selectedChoice.value === props.question.correctChoice;
   submitted.value = true;
-  emit("questionCompleted", props.questionIndex);
+  emit("questionCompleted", {
+    index: props.questionIndex,
+    isCorrect: correct,
+    selectedChoice: selectedChoice.value,
+  });
 }
 
 // Reset the question.
