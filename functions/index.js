@@ -1326,6 +1326,42 @@ export const getAdminData = onCall(
           rateLimitLogs.push(logData);
         });
 
+        // Study activity logs (batched user/visitor events)
+        const activitySnapshot = await db.collection("study_activity_logs")
+            .orderBy("createdAt", "desc")
+            .limit(500)
+            .get();
+
+        const activityLogs = [];
+        activitySnapshot.docs.forEach((doc) => {
+          const log = doc.data();
+          log.id = doc.id;
+          if (log.createdAt && typeof log.createdAt.toDate === "function") {
+            log.createdAt = log.createdAt.toDate().toISOString();
+          } else if (typeof log.createdAt === "string") {
+            log.createdAt = log.createdAt;
+          }
+          activityLogs.push(log);
+        });
+
+        const activityStats = activityLogs.reduce((acc, log) => {
+          const events = Array.isArray(log.events) ? log.events : [];
+          acc.totalBatches += 1;
+          acc.totalEvents += events.length;
+          acc.questionEvents += events.filter((e) => e.type === "question").length;
+          acc.flashcardEvents += events.filter((e) => e.type === "flashcard").length;
+          if (log.visitorId) acc.visitors.add(log.visitorId);
+          if (log.uid) acc.users.add(log.uid);
+          return acc;
+        }, {
+          totalBatches: 0,
+          totalEvents: 0,
+          questionEvents: 0,
+          flashcardEvents: 0,
+          visitors: new Set(),
+          users: new Set(),
+        });
+
         // Get recent function error logs (last 1000)
         const errorLogs = [];
         try {
@@ -1396,7 +1432,16 @@ export const getAdminData = onCall(
               totalFlashcards: flashcardsSnapshotSize,
             },
             rateLimitStats,
+            activityStats: {
+              totalBatches: activityStats.totalBatches,
+              totalEvents: activityStats.totalEvents,
+              questionEvents: activityStats.questionEvents,
+              flashcardEvents: activityStats.flashcardEvents,
+              uniqueVisitors: activityStats.visitors.size,
+              uniqueUsers: activityStats.users.size,
+            },
           },
+          activityLogs,
           timestamp: new Date().toISOString(),
         };
       } catch (error) {
