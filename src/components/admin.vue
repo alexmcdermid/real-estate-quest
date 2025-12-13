@@ -358,8 +358,8 @@
             <template v-slot:item.counts="{ item }">
               <span>Q: {{ item.counts?.questions || 0 }} / F: {{ item.counts?.flashcards || 0 }}</span>
             </template>
-            <template v-slot:item.events="{ item }">
-              <span>{{ (item.events || []).length }}</span>
+            <template v-slot:item.eventCount="{ item }">
+              <span>{{ item.eventCount ?? (item.counts?.total ?? ((item.counts?.questions || 0) + (item.counts?.flashcards || 0))) }}</span>
             </template>
             <template v-slot:item.env="{ item }">
               <v-chip size="small" color="grey">{{ item.env || 'unknown' }}</v-chip>
@@ -563,7 +563,7 @@ const activityHeaders = [
   { title: 'IP', key: 'ip', sortable: true },
   { title: 'Env', key: 'env', sortable: true },
   { title: 'Counts', key: 'counts', sortable: false },
-  { title: 'Events', key: 'events', sortable: false },
+  { title: 'Events', key: 'eventCount', sortable: false },
 ];
 
 const errorHeaders = [

@@ -310,6 +310,7 @@ export const logStudyActivity = onCall(
           counts: {
             questions: questionCount,
             flashcards: flashcardCount,
+            total: sanitizedEvents.length,
           },
           events: sanitizedEvents,
         });
@@ -1344,6 +1345,8 @@ export const getAdminData = onCall(
         const activitySnapshot = await db.collection("study_activity_logs")
             .orderBy("createdAt", "desc")
             .limit(500)
+            // Only fetch lightweight fields to avoid shipping large event payloads
+            .select("createdAt", "env", "uid", "visitorId", "ip", "counts", "totalEvents")
             .get();
 
         const activityLogs = [];
@@ -1355,15 +1358,27 @@ export const getAdminData = onCall(
           } else if (typeof log.createdAt === "string") {
             log.createdAt = log.createdAt;
           }
+          const counts = log.counts || {};
+          const questionEvents = Number(counts.questions) || 0;
+          const flashcardEvents = Number(counts.flashcards) || 0;
+          const totalEvents = typeof counts.total === "number" ?
+            counts.total :
+            (typeof log.totalEvents === "number" ? log.totalEvents :
+              questionEvents + flashcardEvents);
+          log.eventCount = totalEvents;
+          log.counts = {
+            questions: questionEvents,
+            flashcards: flashcardEvents,
+            total: totalEvents,
+          };
           activityLogs.push(log);
         });
 
         const activityStats = activityLogs.reduce((acc, log) => {
-          const events = Array.isArray(log.events) ? log.events : [];
           acc.totalBatches += 1;
-          acc.totalEvents += events.length;
-          acc.questionEvents += events.filter((e) => e.type === "question").length;
-          acc.flashcardEvents += events.filter((e) => e.type === "flashcard").length;
+          acc.totalEvents += log.eventCount || 0;
+          acc.questionEvents += log.counts?.questions || 0;
+          acc.flashcardEvents += log.counts?.flashcards || 0;
           if (log.visitorId) acc.visitors.add(log.visitorId);
           if (log.uid) acc.users.add(log.uid);
           return acc;
