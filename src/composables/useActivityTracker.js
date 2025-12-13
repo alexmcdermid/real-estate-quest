@@ -10,6 +10,7 @@ const VISITOR_ID_STORAGE_KEY = "req:visitor-id";
 const pendingEvents = ref([]);
 let flushTimerId = null;
 let isFlushing = false;
+let lifecycleHandlersAttached = false;
 
 const functions = getFunctions(firebaseApp, "us-west1");
 const logStudyActivity = httpsCallable(functions, "logStudyActivity");
@@ -94,7 +95,7 @@ function recordQuestionAnswer({ question, chapter, isCorrect, selectedChoice, is
     chapter: Number.isFinite(chapter) ? chapter : question.chapter,
     itemNumber: question.questionNumber ?? null,
     isCorrect: typeof isCorrect === "boolean" ? isCorrect : null,
-    selectedChoice: typeof selectedChoice === "number" ? selectedChoice : null,
+    selectedChoice: Number.isFinite(selectedChoice) ? selectedChoice : null,
     isPremiumContent: question.premium === true,
     isProUser: isProUser === true,
   });
@@ -112,7 +113,28 @@ function recordFlashcardView({ flashcard, chapter, isProUser }) {
   });
 }
 
+function attachLifecycleFlushHandlers() {
+  if (lifecycleHandlersAttached) return;
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+
+  const flush = () => {
+    // Best-effort flush; we intentionally don't await in unload/pagehide.
+    flushPendingEvents(true);
+  };
+
+  const onVisibilityChange = () => {
+    if (document.visibilityState === "hidden") flush();
+  };
+
+  window.addEventListener("pagehide", flush);
+  document.addEventListener("visibilitychange", onVisibilityChange);
+
+  lifecycleHandlersAttached = true;
+}
+
 export function useActivityTracker() {
+  attachLifecycleFlushHandlers();
+
   return {
     recordQuestionAnswer,
     recordFlashcardView,
