@@ -197,49 +197,8 @@
 
     <!-- Data Tables -->
     <v-row v-if="!loading && adminData">
-      <!-- All Users Table -->
-      <v-col cols="12">
-        <v-card elevation="2">
-          <v-card-title class="text-h6">
-            <div style="display:flex; align-items:center; width:100%;">
-              <div style="display:flex; align-items:center; flex:1;">
-                <v-icon left color="primary">mdi-account-multiple</v-icon>
-                <span>All Users ({{ adminData.users ? adminData.users.length : 0 }})</span>
-              </div>
-              <div style="flex-shrink:0;">
-                <v-text-field
-                  v-model="usersSearch"
-                  append-icon="mdi-magnify"
-                  label="Search users..."
-                  single-line
-                  hide-details
-                  density="compact"
-                  class="admin-search"
-                ></v-text-field>
-              </div>
-            </div>
-          </v-card-title>
-          <v-data-table
-            :headers="usersHeaders"
-            :items="filteredUsers"
-            :search="usersSearch"
-            :items-per-page="10"
-            class="elevation-1"
-          >
-            <template v-slot:item.emailVerified="{ item }">
-              <v-chip :color="item.emailVerified ? 'success' : 'default'" size="small">
-                {{ item.emailVerified ? 'Yes' : 'No' }}
-              </v-chip>
-            </template>
-            <template v-slot:item.customClaims="{ item }">
-              <span>{{ item.customClaims && item.customClaims.isAdmin ? 'Admin' : '' }}</span>
-            </template>
-          </v-data-table>
-        </v-card>
-      </v-col>
-
       <!-- Members Table -->
-      <v-col cols="12" class="mt-4">
+      <v-col cols="12">
         <v-card elevation="2">
           <v-card-title class="text-h6">
             <div style="display:flex; align-items:center; width:100%;">
@@ -315,6 +274,47 @@
         </v-card>
       </v-col>
 
+      <!-- All Users Table -->
+      <v-col cols="12" class="mt-4">
+        <v-card elevation="2">
+          <v-card-title class="text-h6">
+            <div style="display:flex; align-items:center; width:100%;">
+              <div style="display:flex; align-items:center; flex:1;">
+                <v-icon left color="primary">mdi-account-multiple</v-icon>
+                <span>All Users ({{ adminData.users ? adminData.users.length : 0 }})</span>
+              </div>
+              <div style="flex-shrink:0;">
+                <v-text-field
+                  v-model="usersSearch"
+                  append-icon="mdi-magnify"
+                  label="Search users..."
+                  single-line
+                  hide-details
+                  density="compact"
+                  class="admin-search"
+                ></v-text-field>
+              </div>
+            </div>
+          </v-card-title>
+          <v-data-table
+            :headers="usersHeaders"
+            :items="filteredUsers"
+            :search="usersSearch"
+            :items-per-page="10"
+            class="elevation-1"
+          >
+            <template v-slot:item.emailVerified="{ item }">
+              <v-chip :color="item.emailVerified ? 'success' : 'default'" size="small">
+                {{ item.emailVerified ? 'Yes' : 'No' }}
+              </v-chip>
+            </template>
+            <template v-slot:item.customClaims="{ item }">
+              <span>{{ item.customClaims && item.customClaims.isAdmin ? 'Admin' : '' }}</span>
+            </template>
+          </v-data-table>
+        </v-card>
+      </v-col>
+
       <!-- Activity Logs Table -->
       <v-col cols="12" class="mt-4">
         <v-card elevation="2">
@@ -357,6 +357,12 @@
             </template>
             <template v-slot:item.counts="{ item }">
               <span>Q: {{ item.counts?.questions || 0 }} / F: {{ item.counts?.flashcards || 0 }}</span>
+            </template>
+            <template v-slot:item.questionCorrect="{ item }">
+              <span v-if="item.counts?.questions">
+                ✓ {{ item.counts?.questionCorrect || 0 }} / ✕ {{ item.counts?.questionIncorrect || 0 }}
+              </span>
+              <span v-else>-</span>
             </template>
             <template v-slot:item.eventCount="{ item }">
               <span>{{ item.eventCount ?? (item.counts?.total ?? ((item.counts?.questions || 0) + (item.counts?.flashcards || 0))) }}</span>
@@ -563,6 +569,7 @@ const activityHeaders = [
   { title: 'IP', key: 'ip', sortable: true },
   { title: 'Env', key: 'env', sortable: true },
   { title: 'Counts', key: 'counts', sortable: false },
+  { title: 'Correct', key: 'questionCorrect', sortable: false },
   { title: 'Events', key: 'eventCount', sortable: false },
 ];
 

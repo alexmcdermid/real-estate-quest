@@ -2,12 +2,13 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp } from "../config/firebaseConfig";
 import { ref } from "vue";
 
-const BUFFER_THRESHOLD = 3;
-const FLUSH_INTERVAL_MS = 20000;
+const BUFFER_THRESHOLD = 10;
+const FLUSH_INTERVAL_MS = 30000;
 const MAX_BUFFER_SIZE = 50;
 const VISITOR_ID_STORAGE_KEY = "req:visitor-id";
 
 const pendingEvents = ref([]);
+let firstBufferedAt = null;
 let flushTimerId = null;
 let isFlushing = false;
 let lifecycleHandlersAttached = false;
@@ -36,7 +37,7 @@ function getVisitorId() {
 
 function scheduleFlush() {
   if (flushTimerId !== null) return;
-  flushTimerId = setTimeout(() => flushPendingEvents(true), FLUSH_INTERVAL_MS);
+  flushTimerId = setTimeout(() => flushPendingEvents(false), FLUSH_INTERVAL_MS);
 }
 
 async function flushPendingEvents(force = false) {
@@ -47,7 +48,11 @@ async function flushPendingEvents(force = false) {
     return;
   }
 
-  if (!force && pendingEvents.value.length < BUFFER_THRESHOLD) {
+  const bufferAge = firstBufferedAt ? Date.now() - firstBufferedAt : 0;
+  const thresholdReached = pendingEvents.value.length >= BUFFER_THRESHOLD;
+  const ageExceeded = bufferAge >= FLUSH_INTERVAL_MS;
+
+  if (!force && !thresholdReached && !ageExceeded) {
     scheduleFlush();
     return;
   }
@@ -56,6 +61,7 @@ async function flushPendingEvents(force = false) {
   clearTimeout(flushTimerId);
   flushTimerId = null;
   isFlushing = true;
+  firstBufferedAt = null;
 
   try {
     await logStudyActivity({
@@ -79,6 +85,7 @@ function enqueueEvent(event) {
     ...event,
     clientTs: Date.now(),
   });
+  if (!firstBufferedAt) firstBufferedAt = Date.now();
 
   if (pendingEvents.value.length >= BUFFER_THRESHOLD) {
     flushPendingEvents(true);

@@ -296,6 +296,10 @@ export const logStudyActivity = onCall(
 
       const questionCount = sanitizedEvents.filter((e) => e.type === "question").length;
       const flashcardCount = sanitizedEvents.filter((e) => e.type === "flashcard").length;
+      const questionCorrect = sanitizedEvents.filter(
+          (e) => e.type === "question" && e.isCorrect === true).length;
+      const questionIncorrect = sanitizedEvents.filter(
+          (e) => e.type === "question" && e.isCorrect === false).length;
       const visitorId = typeof request.data?.visitorId === "string" ?
         request.data.visitorId.slice(0, 120) : null;
 
@@ -311,6 +315,8 @@ export const logStudyActivity = onCall(
             questions: questionCount,
             flashcards: flashcardCount,
             total: sanitizedEvents.length,
+            questionCorrect,
+            questionIncorrect,
           },
           events: sanitizedEvents,
         });
@@ -1359,6 +1365,8 @@ export const getAdminData = onCall(
           const counts = log.counts || {};
           const questionEvents = Number(counts.questions) || 0;
           const flashcardEvents = Number(counts.flashcards) || 0;
+          const questionCorrect = Number(counts.questionCorrect) || 0;
+          const questionIncorrect = Number(counts.questionIncorrect) || 0;
           const totalEvents = typeof counts.total === "number" ?
             counts.total :
             (typeof log.totalEvents === "number" ? log.totalEvents :
@@ -1368,7 +1376,11 @@ export const getAdminData = onCall(
             questions: questionEvents,
             flashcards: flashcardEvents,
             total: totalEvents,
+            questionCorrect,
+            questionIncorrect,
           };
+          log.questionCorrect = questionCorrect;
+          log.questionIncorrect = questionIncorrect;
           activityLogs.push(log);
         });
 

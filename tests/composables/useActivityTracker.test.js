@@ -98,7 +98,7 @@ describe("useActivityTracker lifecycle flushing", () => {
 
     expect(mockLogStudyActivity).not.toHaveBeenCalled();
 
-    vi.advanceTimersByTime(20000);
+    vi.advanceTimersByTime(30000);
     await vi.runAllTimersAsync();
 
     expect(mockLogStudyActivity).toHaveBeenCalledTimes(1);
