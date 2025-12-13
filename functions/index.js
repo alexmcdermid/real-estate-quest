@@ -68,6 +68,7 @@ const db = admin.firestore();
 
 const unauthLimiter = new SimpleRateLimiter("unauth_rate_limiter", 40, 60, db);
 const authLimiter = new SimpleRateLimiter("user_rate_limiter", 40, 60, db);
+const activityLimiter = new SimpleRateLimiter("activity_rate_limiter", 120, 60, db);
 
 const stripeSecretKeyDev = defineSecret("STRIPE_SECRET_KEY_DEV");
 const stripeWebhookSecretDev = defineSecret("STRIPE_WEBHOOK_SECRET_DEV");
@@ -221,6 +222,118 @@ function payloadIsStripeError(err, meta) {
   if (fn.includes("stripe") || fn.includes("checkout") || fn.includes("billing")) return true;
   return false;
 }
+
+export const logStudyActivity = onCall(
+    {
+      region: "us-west1",
+      enforceAppCheck: true,
+    },
+    async (request) => {
+      const vid = typeof request.data?.visitorId === "string" ? request.data.visitorId.slice(0, 120) : null;
+      const qualifier = request.auth?.uid ?
+        `u_${request.auth.uid}` :
+        vid ?
+          `v_${vid}` :
+          request.rawRequest.ip || "anon";
+      try {
+        await activityLimiter.rejectOnQuotaExceededOrRecordUsage(qualifier);
+      } catch (err) {
+        try {
+          await db.collection("rate_limit_logs").add({
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            type: "activity",
+            qualifier,
+            uid: request.auth?.uid || null,
+            ip: request.rawRequest?.ip || null,
+            userAgent: request.rawRequest?.headers?.["user-agent"] || null,
+          });
+        } catch (logErr) {
+          console.error("Failed to log rate limit event (activity):", logErr);
+        }
+        throw new HttpsError(
+            "resource-exhausted",
+            "Too many events – please try again in a moment.",
+        );
+      }
+
+      const incomingEvents = Array.isArray(request.data?.events) ?
+        request.data.events.slice(0, 20) : [];
+
+      if (incomingEvents.length === 0) {
+        throw new HttpsError("invalid-argument", "events array with at least one entry is required.");
+      }
+
+      const allowedTypes = new Set(["question", "flashcard"]);
+      const sanitizedEvents = [];
+
+      for (const raw of incomingEvents) {
+        if (!raw || typeof raw !== "object") continue;
+
+        const type = typeof raw.type === "string" ? raw.type.toLowerCase() : "";
+        if (!allowedTypes.has(type)) continue;
+
+        const chapter = Number(raw.chapter);
+        const itemNumber = Number(raw.itemNumber);
+        const event = {
+          type,
+          action: typeof raw.action === "string" ? raw.action.slice(0, 32) : "unknown",
+          chapter: Number.isFinite(chapter) ? chapter : null,
+          itemNumber: Number.isFinite(itemNumber) ? itemNumber : null,
+          isCorrect: typeof raw.isCorrect === "boolean" ? raw.isCorrect : null,
+          selectedChoice: Number.isFinite(raw.selectedChoice) ? raw.selectedChoice : null,
+          difficulty: typeof raw.difficulty === "string" ? raw.difficulty.slice(0, 32) : null,
+          clientTs: typeof raw.clientTs === "number" ? raw.clientTs : null,
+          isPremiumContent: raw.isPremiumContent === true,
+          isProUser: raw.isProUser === true,
+        };
+
+        sanitizedEvents.push(event);
+      }
+
+      if (sanitizedEvents.length === 0) {
+        throw new HttpsError("invalid-argument", "No valid events were provided.");
+      }
+
+      const questionCount = sanitizedEvents.filter((e) => e.type === "question").length;
+      const flashcardCount = sanitizedEvents.filter((e) => e.type === "flashcard").length;
+      const questionCorrect = sanitizedEvents.filter(
+          (e) => e.type === "question" && e.isCorrect === true).length;
+      const questionIncorrect = sanitizedEvents.filter(
+          (e) => e.type === "question" && e.isCorrect === false).length;
+      const visitorId = typeof request.data?.visitorId === "string" ?
+        request.data.visitorId.slice(0, 120) : null;
+
+      try {
+        await db.collection("study_activity_logs").add({
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          env: process.env.NODE_ENV || "unknown",
+          uid: request.auth?.uid || null,
+          visitorId: visitorId || null,
+          ip: request.rawRequest?.ip || null,
+          userAgent: request.rawRequest?.headers?.["user-agent"] || null,
+          counts: {
+            questions: questionCount,
+            flashcards: flashcardCount,
+            total: sanitizedEvents.length,
+            questionCorrect,
+            questionIncorrect,
+          },
+          events: sanitizedEvents,
+        });
+
+        return {success: true, stored: sanitizedEvents.length};
+      } catch (error) {
+        await logFunctionError(error, {
+          functionName: "logStudyActivity",
+          uid: request.auth?.uid || null,
+          ip: request.rawRequest?.ip || null,
+          requestData: {eventCount: sanitizedEvents.length},
+          severity: "error",
+        });
+        throw new HttpsError("internal", "Failed to record activity");
+      }
+    },
+);
 
 export const getQuestionsByChapter = onCall(
     {
@@ -1234,6 +1347,60 @@ export const getAdminData = onCall(
           rateLimitLogs.push(logData);
         });
 
+        // Study activity logs (batched user/visitor events)
+        const activitySnapshot = await db.collection("study_activity_logs")
+            .orderBy("createdAt", "desc")
+            .limit(500)
+            // Only fetch lightweight fields to avoid shipping large event payloads
+            .select("createdAt", "env", "uid", "visitorId", "ip", "counts", "totalEvents")
+            .get();
+
+        const activityLogs = [];
+        activitySnapshot.docs.forEach((doc) => {
+          const log = doc.data();
+          log.id = doc.id;
+          if (log.createdAt && typeof log.createdAt.toDate === "function") {
+            log.createdAt = log.createdAt.toDate().toISOString();
+          }
+          const counts = log.counts || {};
+          const questionEvents = Number(counts.questions) || 0;
+          const flashcardEvents = Number(counts.flashcards) || 0;
+          const questionCorrect = Number(counts.questionCorrect) || 0;
+          const questionIncorrect = Number(counts.questionIncorrect) || 0;
+          const totalEvents = typeof counts.total === "number" ?
+            counts.total :
+            (typeof log.totalEvents === "number" ? log.totalEvents :
+              questionEvents + flashcardEvents);
+          log.eventCount = totalEvents;
+          log.counts = {
+            questions: questionEvents,
+            flashcards: flashcardEvents,
+            total: totalEvents,
+            questionCorrect,
+            questionIncorrect,
+          };
+          log.questionCorrect = questionCorrect;
+          log.questionIncorrect = questionIncorrect;
+          activityLogs.push(log);
+        });
+
+        const activityStats = activityLogs.reduce((acc, log) => {
+          acc.totalBatches += 1;
+          acc.totalEvents += log.eventCount || 0;
+          acc.questionEvents += log.counts?.questions || 0;
+          acc.flashcardEvents += log.counts?.flashcards || 0;
+          if (log.visitorId) acc.visitors.add(log.visitorId);
+          if (log.uid) acc.users.add(log.uid);
+          return acc;
+        }, {
+          totalBatches: 0,
+          totalEvents: 0,
+          questionEvents: 0,
+          flashcardEvents: 0,
+          visitors: new Set(),
+          users: new Set(),
+        });
+
         // Get recent function error logs (last 1000)
         const errorLogs = [];
         try {
@@ -1304,7 +1471,16 @@ export const getAdminData = onCall(
               totalFlashcards: flashcardsSnapshotSize,
             },
             rateLimitStats,
+            activityStats: {
+              totalBatches: activityStats.totalBatches,
+              totalEvents: activityStats.totalEvents,
+              questionEvents: activityStats.questionEvents,
+              flashcardEvents: activityStats.flashcardEvents,
+              uniqueVisitors: activityStats.visitors.size,
+              uniqueUsers: activityStats.users.size,
+            },
           },
+          activityLogs,
           timestamp: new Date().toISOString(),
         };
       } catch (error) {

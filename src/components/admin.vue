@@ -59,6 +59,44 @@
         </v-card>
       </v-col>
 
+      <!-- Activity Stats Card -->
+      <v-col cols="12" md="3">
+        <v-card class="mb-4" elevation="2">
+          <v-card-title class="text-h6">
+            <v-icon left color="success">mdi-chart-areaspline</v-icon>
+            Study Activity
+          </v-card-title>
+          <v-card-text>
+            <v-list density="compact">
+              <v-list-item>
+                <v-list-item-title>Event Batches</v-list-item-title>
+                <v-list-item-subtitle>{{ adminData.stats.activityStats.totalBatches }}</v-list-item-subtitle>
+              </v-list-item>
+              <v-list-item>
+                <v-list-item-title>Total Events</v-list-item-title>
+                <v-list-item-subtitle>{{ adminData.stats.activityStats.totalEvents }}</v-list-item-subtitle>
+              </v-list-item>
+              <v-list-item>
+                <v-list-item-title>Question Events</v-list-item-title>
+                <v-list-item-subtitle>{{ adminData.stats.activityStats.questionEvents }}</v-list-item-subtitle>
+              </v-list-item>
+              <v-list-item>
+                <v-list-item-title>Flashcard Events</v-list-item-title>
+                <v-list-item-subtitle>{{ adminData.stats.activityStats.flashcardEvents }}</v-list-item-subtitle>
+              </v-list-item>
+              <v-list-item>
+                <v-list-item-title>Unique Visitors</v-list-item-title>
+                <v-list-item-subtitle>{{ adminData.stats.activityStats.uniqueVisitors }}</v-list-item-subtitle>
+              </v-list-item>
+              <v-list-item>
+                <v-list-item-title>Unique Users</v-list-item-title>
+                <v-list-item-subtitle>{{ adminData.stats.activityStats.uniqueUsers }}</v-list-item-subtitle>
+              </v-list-item>
+            </v-list>
+          </v-card-text>
+        </v-card>
+      </v-col>
+
       <!-- Rate Limit Stats Card -->
       <v-col cols="12" md="3">
         <v-card class="mb-4" elevation="2">
@@ -114,8 +152,10 @@
           </v-card-text>
         </v-card>
       </v-col>
+    </v-row>
 
-      <!-- Quick Actions Card -->
+    <!-- Quick Actions -->
+    <v-row v-if="!loading && adminData">
       <v-col cols="12" md="6">
         <v-card class="mb-4" elevation="2">
           <v-card-title class="text-h6">
@@ -157,7 +197,7 @@
 
     <!-- Data Tables -->
     <v-row v-if="!loading && adminData">
-  <!-- Members Table -->
+      <!-- Members Table -->
       <v-col cols="12">
         <v-card elevation="2">
           <v-card-title class="text-h6">
@@ -270,6 +310,65 @@
             </template>
             <template v-slot:item.customClaims="{ item }">
               <span>{{ item.customClaims && item.customClaims.isAdmin ? 'Admin' : '' }}</span>
+            </template>
+          </v-data-table>
+        </v-card>
+      </v-col>
+
+      <!-- Activity Logs Table -->
+      <v-col cols="12" class="mt-4">
+        <v-card elevation="2">
+          <v-card-title class="text-h6">
+            <div style="display:flex; align-items:center; width:100%;">
+              <div style="display:flex; align-items:center; flex:1;">
+                <v-icon left color="success">mdi-chart-line</v-icon>
+                <span>Study Activity Logs ({{ filteredActivityLogs.length }})</span>
+              </div>
+              <div style="flex-shrink:0;">
+                <v-text-field
+                  v-model="activitySearch"
+                  append-icon="mdi-magnify"
+                  label="Search activity..."
+                  single-line
+                  hide-details
+                  density="compact"
+                  class="admin-search"
+                ></v-text-field>
+              </div>
+            </div>
+          </v-card-title>
+          <v-data-table
+            :headers="activityHeaders"
+            :items="filteredActivityLogs"
+            :search="activitySearch"
+            :items-per-page="15"
+            class="elevation-1"
+          >
+            <template v-slot:item.createdAt="{ item }">
+              {{ formatDate(item.createdAt) }}
+            </template>
+            <template v-slot:item.uid="{ item }">
+              <code v-if="item.uid">{{ item.uid }}</code>
+              <span v-else class="text-grey">Anonymous</span>
+            </template>
+            <template v-slot:item.visitorId="{ item }">
+              <code v-if="item.visitorId">{{ item.visitorId }}</code>
+              <span v-else class="text-grey">-</span>
+            </template>
+            <template v-slot:item.counts="{ item }">
+              <span>Q: {{ item.counts?.questions || 0 }} / F: {{ item.counts?.flashcards || 0 }}</span>
+            </template>
+            <template v-slot:item.questionCorrect="{ item }">
+              <span v-if="item.counts?.questions">
+                ✓ {{ item.counts?.questionCorrect || 0 }} / ✕ {{ item.counts?.questionIncorrect || 0 }}
+              </span>
+              <span v-else>-</span>
+            </template>
+            <template v-slot:item.eventCount="{ item }">
+              <span>{{ item.eventCount ?? (item.counts?.total ?? ((item.counts?.questions || 0) + (item.counts?.flashcards || 0))) }}</span>
+            </template>
+            <template v-slot:item.env="{ item }">
+              <v-chip size="small" color="grey">{{ item.env || 'unknown' }}</v-chip>
             </template>
           </v-data-table>
         </v-card>
@@ -438,6 +537,7 @@ const { adminData, loading, lastUpdated } = storeToRefs(adminStore);
 
 const memberSearch = ref('');
 const rateLimitSearch = ref('');
+const activitySearch = ref('');
 
 
 // Table headers
@@ -460,6 +560,17 @@ const rateLimitHeaders = [
   { title: 'User ID', key: 'uid', sortable: true },
   { title: 'IP Address', key: 'ip', sortable: true },
   { title: 'Qualifier', key: 'qualifier', sortable: true }
+];
+
+const activityHeaders = [
+  { title: 'Timestamp', key: 'createdAt', sortable: true },
+  { title: 'User ID', key: 'uid', sortable: true },
+  { title: 'Visitor ID', key: 'visitorId', sortable: true },
+  { title: 'IP', key: 'ip', sortable: true },
+  { title: 'Env', key: 'env', sortable: true },
+  { title: 'Counts', key: 'counts', sortable: false },
+  { title: 'Correct', key: 'questionCorrect', sortable: false },
+  { title: 'Events', key: 'eventCount', sortable: false },
 ];
 
 const errorHeaders = [
@@ -489,6 +600,11 @@ const filteredMembers = computed(() => {
 const filteredRateLimitLogs = computed(() => {
   if (!adminData.value) return [];
   return adminData.value.rateLimitLogs;
+});
+
+const filteredActivityLogs = computed(() => {
+  if (!adminData.value) return [];
+  return adminData.value.activityLogs || [];
 });
 
 const errorSearch = ref('');

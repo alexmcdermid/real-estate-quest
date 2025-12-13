@@ -35,7 +35,7 @@
                 :is="item.component"
                 v-bind="item.props"
                 proType="flashcards"
-                @flashcardViewed="markFlashcardViewed(index)"
+                @flashcardViewed="markFlashcardViewed"
                 @flashcardDifficulty="markFlashcardDifficulty"
               />
             </v-col>
@@ -83,10 +83,12 @@ import ProCard from "./proCard.vue";
 import BlurredCtaCard from "./BlurredCtaCard.vue";
 import useOptions from "../composables/useOption";
 import { chapters } from "@/constants/chapters";
+import { useActivityTracker } from "../composables/useActivityTracker";
 
 const authStore = useAuthStore();
 const { authInitialized, isPro } = storeToRefs(authStore);
 const { options } = useOptions();
+const { recordFlashcardView, flushPendingEvents } = useActivityTracker();
 
 const isLoading = ref(true);
 const selectedChapter = ref(1);
@@ -121,8 +123,23 @@ const flashcardsWithProCard = computed(() => {
 
 const hasViewedFlashcards = computed(() => viewedFlashcards.value.size > 0);
 
-function markFlashcardViewed(index) {
+function markFlashcardViewed(payload) {
+  const index = typeof payload === "object" ? payload.index : payload;
+  const viewed = typeof payload === "object" ? payload.viewed : true;
+
+  if (typeof index !== "number" || !viewed) return;
+  if (viewedFlashcards.value.has(index)) return;
+
   viewedFlashcards.value.add(index);
+
+  const flashcard = flashcards.value[index];
+  if (flashcard) {
+    recordFlashcardView({
+      flashcard,
+      chapter: selectedChapter.value,
+      isProUser: isPro.value,
+    });
+  }
 }
 
 function markFlashcardDifficulty({ index, difficulty }) {
