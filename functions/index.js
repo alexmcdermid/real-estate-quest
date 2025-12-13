@@ -229,7 +229,12 @@ export const logStudyActivity = onCall(
       enforceAppCheck: true,
     },
     async (request) => {
-      const qualifier = request.auth?.uid ? `u_${request.auth.uid}` : request.rawRequest.ip || "anon";
+      const vid = typeof request.data?.visitorId === "string" ? request.data.visitorId.slice(0, 120) : null;
+      const qualifier = request.auth?.uid
+        ? `u_${request.auth.uid}`
+        : vid
+          ? `v_${vid}`
+          : request.rawRequest.ip || "anon";
       try {
         await activityLimiter.rejectOnQuotaExceededOrRecordUsage(qualifier);
       } catch (err) {
