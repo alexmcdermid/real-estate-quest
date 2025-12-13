@@ -230,11 +230,11 @@ export const logStudyActivity = onCall(
     },
     async (request) => {
       const vid = typeof request.data?.visitorId === "string" ? request.data.visitorId.slice(0, 120) : null;
-      const qualifier = request.auth?.uid
-        ? `u_${request.auth.uid}`
-        : vid
-          ? `v_${vid}`
-          : request.rawRequest.ip || "anon";
+      const qualifier = request.auth?.uid ?
+        `u_${request.auth.uid}` :
+        vid ?
+          `v_${vid}` :
+          request.rawRequest.ip || "anon";
       try {
         await activityLimiter.rejectOnQuotaExceededOrRecordUsage(qualifier);
       } catch (err) {
@@ -1355,8 +1355,6 @@ export const getAdminData = onCall(
           log.id = doc.id;
           if (log.createdAt && typeof log.createdAt.toDate === "function") {
             log.createdAt = log.createdAt.toDate().toISOString();
-          } else if (typeof log.createdAt === "string") {
-            log.createdAt = log.createdAt;
           }
           const counts = log.counts || {};
           const questionEvents = Number(counts.questions) || 0;
