@@ -1069,7 +1069,9 @@ export const handleStripeWebhook = onRequest(
             break;
           }
 
-          const userId = memberSnap.docs[0].id;
+          const memberDoc = memberSnap.docs[0];
+          const userId = memberDoc.id;
+          const memberData = memberDoc.data();
 
           try {
             if (cancelAt) {
@@ -1095,6 +1097,13 @@ export const handleStripeWebhook = onRequest(
                 expires: cancelAt,
               });
             } else {
+              const hadCancelScheduled = !!memberData.cancelAt;
+
+              if (!hadCancelScheduled) {
+                // renewal / invoice roll / metadata update
+                console.log(`User ${userId} subscription updated with no cancellation scheduled. No action needed.`);
+                break;
+              }
               // user resumed subscription — remove scheduled cancel
               console.log(`User ${userId} resumed subscription. Clearing cancelAt.`);
 
