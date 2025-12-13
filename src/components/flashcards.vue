@@ -73,7 +73,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onBeforeUnmount, computed } from "vue";
+import { ref, watch, onMounted, computed } from "vue";
 import { useAuthStore } from "../composables/useAuth";
 import { storeToRefs } from "pinia";
 import { useRoute, useRouter } from "vue-router";
@@ -197,10 +197,6 @@ onMounted(() => {
       }
     });
   }
-});
-
-onBeforeUnmount(() => {
-  flushPendingEvents(true);
 });
 
 function shuffleArray(array) {
