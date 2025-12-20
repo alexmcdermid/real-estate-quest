@@ -84,6 +84,84 @@ const isProduction = process.env.NODE_ENV === "production";
 // Initialize Stripe (lazy initialization in functions)
 let stripe;
 
+const ACTIVITY_LOG_PAGE_SIZE = 20;
+const RATE_LIMIT_LOG_PAGE_SIZE = 20;
+const ERROR_LOG_PAGE_SIZE = 20;
+const MEMBERS_PAGE_SIZE = 20;
+const USERS_PAGE_SIZE = 20;
+
+function normalizeActivityLogDoc(doc) {
+  const log = doc.data();
+  log.id = doc.id;
+
+  let createdAtMs = null;
+  if (log.createdAt && typeof log.createdAt.toDate === "function") {
+    createdAtMs = log.createdAt.toMillis();
+    log.createdAt = log.createdAt.toDate().toISOString();
+  } else if (typeof log.createdAt === "string") {
+    const parsed = Date.parse(log.createdAt);
+    createdAtMs = Number.isNaN(parsed) ? null : parsed;
+  }
+
+  const counts = log.counts || {};
+  const questionEvents = Number(counts.questions) || 0;
+  const flashcardEvents = Number(counts.flashcards) || 0;
+  const questionCorrect = Number(counts.questionCorrect) || 0;
+  const questionIncorrect = Number(counts.questionIncorrect) || 0;
+  const totalEvents = typeof counts.total === "number" ?
+    counts.total :
+    (typeof log.totalEvents === "number" ? log.totalEvents :
+      questionEvents + flashcardEvents);
+
+  log.eventCount = totalEvents;
+  log.counts = {
+    questions: questionEvents,
+    flashcards: flashcardEvents,
+    total: totalEvents,
+    questionCorrect,
+    questionIncorrect,
+  };
+  log.questionCorrect = questionCorrect;
+  log.questionIncorrect = questionIncorrect;
+  log.createdAtMs = createdAtMs;
+
+  return log;
+}
+
+function normalizeRateLimitLogDoc(doc) {
+  const logData = doc.data();
+  logData.id = doc.id;
+
+  if (logData.timestamp && typeof logData.timestamp.toDate === "function") {
+    logData.timestampMs = logData.timestamp.toMillis();
+    logData.timestamp = logData.timestamp.toDate().toISOString();
+  } else if (typeof logData.timestamp === "string") {
+    const parsed = Date.parse(logData.timestamp);
+    logData.timestampMs = Number.isNaN(parsed) ? null : parsed;
+  }
+  return logData;
+}
+
+function normalizeErrorLogDoc(doc) {
+  const e = doc.data();
+  e.id = doc.id;
+  if (e.timestamp && typeof e.timestamp.toDate === "function") {
+    e.timestampMs = e.timestamp.toMillis();
+    e.timestamp = e.timestamp.toDate().toISOString();
+  } else if (typeof e.timestamp === "string") {
+    const parsed = Date.parse(e.timestamp);
+    e.timestampMs = Number.isNaN(parsed) ? null : parsed;
+  }
+  if (e.firstSeen && typeof e.firstSeen.toDate === "function") {
+    e.firstSeen = e.firstSeen.toDate().toISOString();
+  }
+  if (e.lastSeen && typeof e.lastSeen.toDate === "function") {
+    e.lastSeenMs = e.lastSeen.toMillis();
+    e.lastSeen = e.lastSeen.toDate().toISOString();
+  }
+  return e;
+}
+
 /**
  * Safely stringifies an object by omitting circular references.
  *
@@ -1291,12 +1369,16 @@ export const getAdminData = onCall(
       console.log(`Admin data request from user: ${userId}`);
 
       try {
-        // Get all Firebase Auth users
+        // Get Firebase Auth users (paginated)
         let allUsers = [];
         let totalAuthUsers = 0;
+        let usersHasMore = false;
+        let usersCursor = null;
         try {
-          const listUsersResult = await admin.auth().listUsers();
+          const listUsersResult = await admin.auth().listUsers(USERS_PAGE_SIZE);
           totalAuthUsers = listUsersResult.users.length;
+          usersHasMore = !!listUsersResult.pageToken;
+          usersCursor = listUsersResult.pageToken || null;
           allUsers = listUsersResult.users.map((user) => ({
             uid: user.uid,
             email: user.email,
@@ -1310,79 +1392,79 @@ export const getAdminData = onCall(
           console.error("Error fetching users from Auth:", authError);
         }
 
-        // Get all members data (paying customers)
-        // this defaults to 1000 users
-        // for more would need server pagination
-        const membersSnapshot = await db.collection("members").get();
+        // Get members data (paginated)
+        const membersSnapshot = await db.collection("members")
+            .orderBy(admin.firestore.FieldPath.documentId(), "desc")
+            .limit(MEMBERS_PAGE_SIZE + 1)
+            .get();
         const members = [];
+        const membersHasMore = membersSnapshot.size > MEMBERS_PAGE_SIZE;
+        const memberDocs = membersHasMore ?
+          membersSnapshot.docs.slice(0, MEMBERS_PAGE_SIZE) :
+          membersSnapshot.docs;
+        const lastMemberDoc = memberDocs[memberDocs.length - 1];
+        const membersCursor = lastMemberDoc ? {
+          id: lastMemberDoc.id,
+        } : null;
 
-        for (const doc of membersSnapshot.docs) {
+        for (const doc of memberDocs) {
           const memberData = doc.data();
           memberData.id = doc.id;
 
           // Convert Timestamps to readable dates
-          if (memberData.cancelAt) {
+          if (memberData.cancelAt && typeof memberData.cancelAt.toDate === "function") {
             memberData.cancelAt = memberData.cancelAt.toDate().toISOString();
           }
 
           members.push(memberData);
         }
 
-        // Get all rate limit logs (last 1000 entries)
+        // Get rate limit logs (paginated)
         const rateLimitSnapshot = await db.collection("rate_limit_logs")
             .orderBy("timestamp", "desc")
-            .limit(1000)
+            .orderBy(admin.firestore.FieldPath.documentId(), "desc")
+            .limit(RATE_LIMIT_LOG_PAGE_SIZE + 1)
             .get();
 
-        const rateLimitLogs = [];
-        rateLimitSnapshot.docs.forEach((doc) => {
-          const logData = doc.data();
-          logData.id = doc.id;
-
-          // Convert Timestamp to readable date
-          if (logData.timestamp) {
-            logData.timestamp = logData.timestamp.toDate().toISOString();
-          }
-
-          rateLimitLogs.push(logData);
-        });
+        const rateLimitDocs = rateLimitSnapshot.docs;
+        const rateLimitHasMore = rateLimitDocs.length > RATE_LIMIT_LOG_PAGE_SIZE;
+        const rateLimitSlice = rateLimitHasMore ?
+          rateLimitDocs.slice(0, RATE_LIMIT_LOG_PAGE_SIZE) :
+          rateLimitDocs;
+        const rateLimitLogs = rateLimitSlice.map(normalizeRateLimitLogDoc);
+        const lastRateDoc = rateLimitSlice[rateLimitSlice.length - 1];
+        const lastRateTs = lastRateDoc?.get("timestamp");
+        const rateLimitCursor = lastRateDoc ? {
+          timestampMs: lastRateTs?.toMillis ?
+            lastRateTs.toMillis() :
+            (typeof lastRateTs === "string" ? Date.parse(lastRateTs) : null),
+          id: lastRateDoc.id,
+        } : null;
 
         // Study activity logs (batched user/visitor events)
         const activitySnapshot = await db.collection("study_activity_logs")
             .orderBy("createdAt", "desc")
-            .limit(500)
+            .orderBy(admin.firestore.FieldPath.documentId(), "desc")
+            .limit(ACTIVITY_LOG_PAGE_SIZE + 1)
             // Only fetch lightweight fields to avoid shipping large event payloads
             .select("createdAt", "env", "uid", "visitorId", "ip", "counts", "totalEvents")
             .get();
 
-        const activityLogs = [];
-        activitySnapshot.docs.forEach((doc) => {
-          const log = doc.data();
-          log.id = doc.id;
-          if (log.createdAt && typeof log.createdAt.toDate === "function") {
-            log.createdAt = log.createdAt.toDate().toISOString();
-          }
-          const counts = log.counts || {};
-          const questionEvents = Number(counts.questions) || 0;
-          const flashcardEvents = Number(counts.flashcards) || 0;
-          const questionCorrect = Number(counts.questionCorrect) || 0;
-          const questionIncorrect = Number(counts.questionIncorrect) || 0;
-          const totalEvents = typeof counts.total === "number" ?
-            counts.total :
-            (typeof log.totalEvents === "number" ? log.totalEvents :
-              questionEvents + flashcardEvents);
-          log.eventCount = totalEvents;
-          log.counts = {
-            questions: questionEvents,
-            flashcards: flashcardEvents,
-            total: totalEvents,
-            questionCorrect,
-            questionIncorrect,
-          };
-          log.questionCorrect = questionCorrect;
-          log.questionIncorrect = questionIncorrect;
-          activityLogs.push(log);
-        });
+        const activityDocs = activitySnapshot.docs;
+        const activityHasMore = activityDocs.length > ACTIVITY_LOG_PAGE_SIZE;
+        const activityDocsSlice = activityHasMore ?
+          activityDocs.slice(0, ACTIVITY_LOG_PAGE_SIZE) :
+          activityDocs;
+        const activityLogs = activityDocsSlice.map(normalizeActivityLogDoc);
+        const lastActivityDoc = activityDocsSlice[activityDocsSlice.length - 1];
+        const lastActivityCreatedAt = lastActivityDoc?.get("createdAt");
+        const activityCursor = lastActivityDoc ? {
+          createdAtMs: lastActivityCreatedAt?.toMillis ?
+            lastActivityCreatedAt.toMillis() :
+            (typeof lastActivityCreatedAt === "string" ?
+              Date.parse(lastActivityCreatedAt) : null),
+          id: lastActivityDoc.id,
+        } : null;
 
         const activityStats = activityLogs.reduce((acc, log) => {
           acc.totalBatches += 1;
@@ -1401,22 +1483,29 @@ export const getAdminData = onCall(
           users: new Set(),
         });
 
-        // Get recent function error logs (last 1000)
-        const errorLogs = [];
+        // Get recent function error logs (paginated)
+        let errorLogs = [];
+        let errorHasMore = false;
+        let errorCursor = null;
         try {
           const errorSnapshot = await db.collection("function_error_logs")
               .orderBy("lastSeen", "desc")
-              .limit(1000)
+              .orderBy(admin.firestore.FieldPath.documentId(), "desc")
+              .limit(ERROR_LOG_PAGE_SIZE + 1)
               .get();
 
-          errorSnapshot.docs.forEach((doc) => {
-            const e = doc.data();
-            e.id = doc.id;
-            if (e.timestamp) e.timestamp = e.timestamp.toDate().toISOString();
-            if (e.firstSeen) e.firstSeen = e.firstSeen.toDate().toISOString();
-            if (e.lastSeen) e.lastSeen = e.lastSeen.toDate().toISOString();
-            errorLogs.push(e);
-          });
+          const errorDocs = errorSnapshot.docs;
+          errorHasMore = errorDocs.length > ERROR_LOG_PAGE_SIZE;
+          const errorSlice = errorHasMore ? errorDocs.slice(0, ERROR_LOG_PAGE_SIZE) : errorDocs;
+          errorLogs = errorSlice.map(normalizeErrorLogDoc);
+          const lastErrorDoc = errorSlice[errorSlice.length - 1];
+          const lastSeen = lastErrorDoc?.get("lastSeen");
+          errorCursor = lastErrorDoc ? {
+            lastSeenMs: lastSeen?.toMillis ?
+              lastSeen.toMillis() :
+              (typeof lastSeen === "string" ? Date.parse(lastSeen) : null),
+            id: lastErrorDoc.id,
+          } : null;
         } catch (err) {
           console.error("Failed to fetch function_error_logs:", err);
         }
@@ -1459,7 +1548,27 @@ export const getAdminData = onCall(
           users: allUsers,
           members,
           rateLimitLogs,
+          rateLimitLogsPageInfo: {
+            hasMore: rateLimitHasMore,
+            cursor: rateLimitCursor,
+          },
           errorLogs,
+          errorLogsPageInfo: {
+            hasMore: errorHasMore,
+            cursor: errorCursor,
+          },
+          activityLogsPageInfo: {
+            hasMore: activityHasMore,
+            cursor: activityCursor,
+          },
+          membersPageInfo: {
+            hasMore: membersHasMore,
+            cursor: membersCursor,
+          },
+          usersPageInfo: {
+            hasMore: usersHasMore,
+            cursor: usersCursor,
+          },
           stats: {
             totalAuthUsers,
             totalMembers,
@@ -1495,5 +1604,256 @@ export const getAdminData = onCall(
         });
         throw new HttpsError("internal", "Failed to fetch admin data");
       }
+    },
+);
+
+export const getStudyActivityLogsPage = onCall(
+    {
+      region: "us-west1",
+      enforceAppCheck: true,
+    },
+    async (request) => {
+      const authContext = request.auth;
+
+      if (!authContext || !authContext.uid) {
+        throw new HttpsError("unauthenticated", "Authentication required");
+      }
+
+      const isAdminClaim = authContext.token?.isAdmin;
+      if (!isAdminClaim) {
+        throw new HttpsError("permission-denied", "Admin access required");
+      }
+
+      const page = Number(request.data?.page) || 1;
+      const pageSize = Number(request.data?.pageSize) || ACTIVITY_LOG_PAGE_SIZE;
+      const offset = (page - 1) * pageSize;
+
+      // Get total count
+      const totalQuery = db.collection("study_activity_logs");
+      const totalSnapshot = await totalQuery.count().get();
+      const total = totalSnapshot.data().count;
+
+      const query = db.collection("study_activity_logs")
+          .orderBy("createdAt", "desc")
+          .orderBy(admin.firestore.FieldPath.documentId(), "desc")
+          .offset(offset)
+          .limit(pageSize)
+          .select("createdAt", "env", "uid", "visitorId", "ip", "counts", "totalEvents");
+
+      const snapshot = await query.get();
+      const activityLogs = snapshot.docs.map(normalizeActivityLogDoc);
+      const hasMore = (page * pageSize) < total;
+
+      return {
+        activityLogs,
+        pageInfo: {
+          hasMore,
+          page,
+          pageSize,
+          total,
+        },
+      };
+    },
+);
+
+export const getRateLimitLogsPage = onCall(
+    {
+      region: "us-west1",
+      enforceAppCheck: true,
+    },
+    async (request) => {
+      const authContext = request.auth;
+
+      if (!authContext || !authContext.uid) {
+        throw new HttpsError("unauthenticated", "Authentication required");
+      }
+
+      const isAdminClaim = authContext.token?.isAdmin;
+      if (!isAdminClaim) {
+        throw new HttpsError("permission-denied", "Admin access required");
+      }
+
+      const page = Number(request.data?.page) || 1;
+      const pageSize = Number(request.data?.pageSize) || RATE_LIMIT_LOG_PAGE_SIZE;
+      const offset = (page - 1) * pageSize;
+
+      // Get total count
+      const totalQuery = db.collection("rate_limit_logs");
+      const totalSnapshot = await totalQuery.count().get();
+      const total = totalSnapshot.data().count;
+
+      const query = db.collection("rate_limit_logs")
+          .orderBy("timestamp", "desc")
+          .orderBy(admin.firestore.FieldPath.documentId(), "desc")
+          .offset(offset)
+          .limit(pageSize);
+
+      const snapshot = await query.get();
+      const rateLimitLogs = snapshot.docs.map(normalizeRateLimitLogDoc);
+      const hasMore = (page * pageSize) < total;
+
+      return {
+        rateLimitLogs,
+        pageInfo: {
+          hasMore,
+          page,
+          pageSize,
+          total,
+        },
+      };
+    },
+);
+
+export const getFunctionErrorLogsPage = onCall(
+    {
+      region: "us-west1",
+      enforceAppCheck: true,
+    },
+    async (request) => {
+      const authContext = request.auth;
+
+      if (!authContext || !authContext.uid) {
+        throw new HttpsError("unauthenticated", "Authentication required");
+      }
+
+      const isAdminClaim = authContext.token?.isAdmin;
+      if (!isAdminClaim) {
+        throw new HttpsError("permission-denied", "Admin access required");
+      }
+
+      const page = Number(request.data?.page) || 1;
+      const pageSize = Number(request.data?.pageSize) || ERROR_LOG_PAGE_SIZE;
+      const offset = (page - 1) * pageSize;
+
+      // Get total count
+      const totalQuery = db.collection("function_error_logs");
+      const totalSnapshot = await totalQuery.count().get();
+      const total = totalSnapshot.data().count;
+
+      const query = db.collection("function_error_logs")
+          .orderBy("lastSeen", "desc")
+          .orderBy(admin.firestore.FieldPath.documentId(), "desc")
+          .offset(offset)
+          .limit(pageSize);
+
+      const snapshot = await query.get();
+      const errorLogs = snapshot.docs.map(normalizeErrorLogDoc);
+      const hasMore = (page * pageSize) < total;
+
+      return {
+        errorLogs,
+        pageInfo: {
+          hasMore,
+          page,
+          pageSize,
+          total,
+        },
+      };
+    },
+);
+
+export const getMembersPage = onCall(
+    {
+      region: "us-west1",
+      enforceAppCheck: true,
+    },
+    async (request) => {
+      const authContext = request.auth;
+      if (!authContext?.uid) {
+        throw new HttpsError("unauthenticated", "Authentication required");
+      }
+      if (!authContext.token?.isAdmin) {
+        throw new HttpsError("permission-denied", "Admin access required");
+      }
+
+      const page = Number(request.data?.page) || 1;
+      const pageSize = Number(request.data?.pageSize) || MEMBERS_PAGE_SIZE;
+      const offset = (page - 1) * pageSize;
+
+      // Get total count
+      const totalQuery = db.collection("members");
+      const totalSnapshot = await totalQuery.count().get();
+      const total = totalSnapshot.data().count;
+
+      const query = db.collection("members")
+          .orderBy(admin.firestore.FieldPath.documentId(), "desc")
+          .offset(offset)
+          .limit(pageSize);
+
+      const snapshot = await query.get();
+      const members = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        data.id = doc.id;
+        if (data.cancelAt && typeof data.cancelAt.toDate === "function") {
+          data.cancelAt = data.cancelAt.toDate().toISOString();
+        }
+        return data;
+      });
+      const hasMore = (page * pageSize) < total;
+
+      return {
+        members,
+        pageInfo: {
+          hasMore,
+          page,
+          pageSize,
+          total,
+        },
+      };
+    },
+);
+
+export const getUsersPage = onCall(
+    {
+      region: "us-west1",
+      enforceAppCheck: true,
+    },
+    async (request) => {
+      const authContext = request.auth;
+      if (!authContext?.uid) {
+        throw new HttpsError("unauthenticated", "Authentication required");
+      }
+      if (!authContext.token?.isAdmin) {
+        throw new HttpsError("permission-denied", "Admin access required");
+      }
+
+      const page = Number(request.data?.page) || 1;
+      const pageSize = Number(request.data?.pageSize) || USERS_PAGE_SIZE;
+      const offset = (page - 1) * pageSize;
+
+      // For Firebase Auth, we need to load all users since no offset support
+      // This is acceptable for admin since user count is typically small
+      let allUsers = [];
+      let pageToken = undefined;
+      do {
+        const result = await admin.auth().listUsers(1000, pageToken);
+        allUsers = allUsers.concat(result.users);
+        pageToken = result.pageToken;
+      } while (pageToken);
+
+      const total = allUsers.length;
+      const start = offset;
+      const end = start + pageSize;
+      const users = allUsers.slice(start, end).map((user) => ({
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        creationTime: user.metadata.creationTime,
+        lastSignInTime: user.metadata.lastSignInTime,
+        emailVerified: user.emailVerified,
+        customClaims: user.customClaims || {},
+      }));
+
+      const hasMore = end < total;
+
+      return {
+        users,
+        pageInfo: {
+          hasMore,
+          page,
+          pageSize,
+          total,
+        },
+      };
     },
 );

@@ -223,7 +223,11 @@
             :headers="memberHeaders"
             :items="filteredMembers"
             :search="memberSearch"
-            :items-per-page="10"
+            v-model:options="memberOptions"
+            :server-items-length="membersTotal"
+            :loading="membersLoading"
+            :items-per-page-options="itemsPerPageOptions"
+            @update:options="handleMemberOptionsUpdate"
             class="elevation-1"
           >
             <template v-slot:item.member="{ item }">
@@ -281,7 +285,7 @@
             <div style="display:flex; align-items:center; width:100%;">
               <div style="display:flex; align-items:center; flex:1;">
                 <v-icon left color="primary">mdi-account-multiple</v-icon>
-                <span>All Users ({{ adminData.users ? adminData.users.length : 0 }})</span>
+                <span>All Users ({{ usersTotal }})</span>
               </div>
               <div style="flex-shrink:0;">
                 <v-text-field
@@ -300,7 +304,11 @@
             :headers="usersHeaders"
             :items="filteredUsers"
             :search="usersSearch"
-            :items-per-page="10"
+            v-model:options="userOptions"
+            :server-items-length="usersTotal"
+            :loading="usersLoading"
+            :items-per-page-options="itemsPerPageOptions"
+            @update:options="handleUserOptionsUpdate"
             class="elevation-1"
           >
             <template v-slot:item.emailVerified="{ item }">
@@ -341,7 +349,11 @@
             :headers="activityHeaders"
             :items="filteredActivityLogs"
             :search="activitySearch"
-            :items-per-page="15"
+            v-model:options="activityOptions"
+            :server-items-length="activityLogsTotal"
+            :loading="activityLogsLoading"
+            :items-per-page-options="itemsPerPageOptions"
+            @update:options="handleActivityOptionsUpdate"
             class="elevation-1"
           >
             <template v-slot:item.createdAt="{ item }">
@@ -400,7 +412,11 @@
             :headers="rateLimitHeaders"
             :items="filteredRateLimitLogs"
             :search="rateLimitSearch"
-            :items-per-page="15"
+            v-model:options="rateLimitOptions"
+            :server-items-length="rateLimitLogsTotal"
+            :loading="rateLimitLogsLoading"
+            :items-per-page-options="itemsPerPageOptions"
+            @update:options="handleRateLimitOptionsUpdate"
             class="elevation-1"
           >
             <template v-slot:item.type="{ item }">
@@ -451,7 +467,11 @@
             :headers="errorHeaders"
             :items="filteredErrorLogs"
             :search="errorSearch"
-            :items-per-page="15"
+            v-model:options="errorOptions"
+            :server-items-length="errorLogsTotal"
+            :loading="errorLogsLoading"
+            :items-per-page-options="itemsPerPageOptions"
+            @update:options="handleErrorOptionsUpdate"
             @click:row="onRowClick"
             class="elevation-1"
           >
@@ -533,11 +553,40 @@ const authStore = useAuthStore();
 const { isAdmin } = storeToRefs(authStore);
 
 const adminStore = useAdminStore();
-const { adminData, loading, lastUpdated } = storeToRefs(adminStore);
+const {
+  adminData,
+  loading,
+  lastUpdated,
+  activityLogs,
+  activityLogsTotal,
+  activityLogsLoading,
+  rateLimitLogs,
+  rateLimitLogsTotal,
+  rateLimitLogsLoading,
+  errorLogs,
+  errorLogsTotal,
+  errorLogsLoading,
+  members,
+  membersTotal,
+  membersLoading,
+  users,
+  usersTotal,
+  usersLoading,
+} = storeToRefs(adminStore);
 
 const memberSearch = ref('');
 const rateLimitSearch = ref('');
 const activitySearch = ref('');
+const errorSearch = ref('');
+const usersSearch = ref('');
+
+const activityOptions = ref({ page: 1, itemsPerPage: 20 });
+const rateLimitOptions = ref({ page: 1, itemsPerPage: 20 });
+const errorOptions = ref({ page: 1, itemsPerPage: 20 });
+const memberOptions = ref({ page: 1, itemsPerPage: 20 });
+const userOptions = ref({ page: 1, itemsPerPage: 20 });
+
+const itemsPerPageOptions = [20, 50, 100];
 
 
 // Table headers
@@ -593,25 +642,40 @@ const usersHeaders = [
 
 // Computed properties
 const filteredMembers = computed(() => {
-  if (!adminData.value) return [];
-  return adminData.value.members;
+  if (!members.value) return [];
+  return members.value;
 });
 
 const filteredRateLimitLogs = computed(() => {
-  if (!adminData.value) return [];
-  return adminData.value.rateLimitLogs;
+  if (!rateLimitLogs.value) return [];
+  return rateLimitLogs.value;
 });
 
 const filteredActivityLogs = computed(() => {
-  if (!adminData.value) return [];
-  return adminData.value.activityLogs || [];
+  if (!activityLogs.value) return [];
+  return activityLogs.value;
 });
 
-const errorSearch = ref('');
 const filteredErrorLogs = computed(() => {
-  if (!adminData.value) return [];
-  return adminData.value.errorLogs || [];
+  if (!errorLogs.value) return [];
+  return errorLogs.value;
 });
+
+const filteredUsers = computed(() => {
+  if (!users.value) return [];
+  return users.value;
+});
+
+watch(
+  () => adminData.value?.timestamp,
+  () => {
+    activityOptions.value = { page: 1, itemsPerPage: 20 };
+    rateLimitOptions.value = { page: 1, itemsPerPage: 20 };
+    errorOptions.value = { page: 1, itemsPerPage: 20 };
+    memberOptions.value = { page: 1, itemsPerPage: 20 };
+    userOptions.value = { page: 1, itemsPerPage: 20 };
+  },
+);
 
 const errorDialog = ref({ show: false, item: null });
 
@@ -641,11 +705,25 @@ function onRowClick(...args) {
   if (row) showErrorDetails(row);
 }
 
-const usersSearch = ref('');
-const filteredUsers = computed(() => {
-  if (!adminData.value) return [];
-  return adminData.value.users || [];
-});
+async function handleActivityOptionsUpdate(options) {
+  await adminStore.fetchActivityLogsPage(options.page, options.itemsPerPage);
+}
+
+async function handleRateLimitOptionsUpdate(options) {
+  await adminStore.fetchRateLimitLogsPage(options.page, options.itemsPerPage);
+}
+
+async function handleErrorOptionsUpdate(options) {
+  await adminStore.fetchErrorLogsPage(options.page, options.itemsPerPage);
+}
+
+async function handleMemberOptionsUpdate(options) {
+  await adminStore.fetchMembersPage(options.page, options.itemsPerPage);
+}
+
+async function handleUserOptionsUpdate(options) {
+  await adminStore.fetchUsersPage(options.page, options.itemsPerPage);
+}
 
 // Methods
 

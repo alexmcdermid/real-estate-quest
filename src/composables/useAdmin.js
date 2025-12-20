@@ -9,6 +9,26 @@ export const useAdminStore = defineStore('admin', {
     loading: false,
     lastUpdated: null,
     hasLoadedOnce: false,
+    // Activity logs
+    activityLogs: [],
+    activityLogsTotal: 0,
+    activityLogsLoading: false,
+    // Rate limit logs
+    rateLimitLogs: [],
+    rateLimitLogsTotal: 0,
+    rateLimitLogsLoading: false,
+    // Error logs
+    errorLogs: [],
+    errorLogsTotal: 0,
+    errorLogsLoading: false,
+    // Members
+    members: [],
+    membersTotal: 0,
+    membersLoading: false,
+    // Users
+    users: [],
+    usersTotal: 0,
+    usersLoading: false,
   }),
 
   getters: {
@@ -29,12 +49,6 @@ export const useAdminStore = defineStore('admin', {
     // Content stats
     totalQuestions: (state) => state.adminData?.stats?.contentStats?.totalQuestions || 0,
     totalFlashcards: (state) => state.adminData?.stats?.contentStats?.totalFlashcards || 0,
-
-    // Data arrays
-    members: (state) => state.adminData?.members || [],
-    users: (state) => state.adminData?.users || [],
-    rateLimitLogs: (state) => state.adminData?.rateLimitLogs || [],
-    errorLogs: (state) => state.adminData?.errorLogs || [],
   },
 
   actions: {
@@ -68,10 +82,135 @@ export const useAdminStore = defineStore('admin', {
       await this.fetchAdminData(true); // Force refresh
     },
 
+    async fetchActivityLogsPage(page = 1, pageSize = 20) {
+      if (this.activityLogsLoading) return;
+
+      this.activityLogsLoading = true;
+      try {
+        const functions = getFunctions(firebaseApp, 'us-west1');
+        const getStudyActivityLogsPage = httpsCallable(functions, 'getStudyActivityLogsPage');
+        const result = await getStudyActivityLogsPage({
+          page,
+          pageSize,
+        });
+
+        this.activityLogs = result.data?.activityLogs || [];
+        this.activityLogsTotal = result.data?.pageInfo?.total || 0;
+      } catch (error) {
+        console.error('Error fetching activity logs page:', error);
+        showNotification('Error loading activity logs: ' + error.message, 'error');
+      } finally {
+        this.activityLogsLoading = false;
+      }
+    },
+
+    async fetchRateLimitLogsPage(page = 1, pageSize = 20) {
+      if (this.rateLimitLogsLoading) return;
+
+      this.rateLimitLogsLoading = true;
+      try {
+        const functions = getFunctions(firebaseApp, 'us-west1');
+        const getRateLimitLogsPage = httpsCallable(functions, 'getRateLimitLogsPage');
+        const result = await getRateLimitLogsPage({
+          page,
+          pageSize,
+        });
+
+        this.rateLimitLogs = result.data?.rateLimitLogs || [];
+        this.rateLimitLogsTotal = result.data?.pageInfo?.total || 0;
+      } catch (error) {
+        console.error('Error fetching rate limit logs page:', error);
+        showNotification('Error loading rate limit logs: ' + error.message, 'error');
+      } finally {
+        this.rateLimitLogsLoading = false;
+      }
+    },
+
+    async fetchErrorLogsPage(page = 1, pageSize = 20) {
+      if (this.errorLogsLoading) return;
+
+      this.errorLogsLoading = true;
+      try {
+        const functions = getFunctions(firebaseApp, 'us-west1');
+        const getFunctionErrorLogsPage = httpsCallable(functions, 'getFunctionErrorLogsPage');
+        const result = await getFunctionErrorLogsPage({
+          page,
+          pageSize,
+        });
+
+        this.errorLogs = result.data?.errorLogs || [];
+        this.errorLogsTotal = result.data?.pageInfo?.total || 0;
+      } catch (error) {
+        console.error('Error fetching error logs page:', error);
+        showNotification('Error loading error logs: ' + error.message, 'error');
+      } finally {
+        this.errorLogsLoading = false;
+      }
+    },
+
+    async fetchMembersPage(page = 1, pageSize = 20) {
+      if (this.membersLoading) return;
+
+      this.membersLoading = true;
+      try {
+        const functions = getFunctions(firebaseApp, 'us-west1');
+        const getMembersPage = httpsCallable(functions, 'getMembersPage');
+        const result = await getMembersPage({
+          page,
+          pageSize,
+        });
+
+        this.members = result.data?.members || [];
+        this.membersTotal = result.data?.pageInfo?.total || 0;
+      } catch (error) {
+        console.error('Error fetching members page:', error);
+        showNotification('Error loading members: ' + error.message, 'error');
+      } finally {
+        this.membersLoading = false;
+      }
+    },
+
+    async fetchUsersPage(page = 1, pageSize = 20) {
+      if (this.usersLoading) return;
+
+      this.usersLoading = true;
+      try {
+        const functions = getFunctions(firebaseApp, 'us-west1');
+        const getUsersPage = httpsCallable(functions, 'getUsersPage');
+        const result = await getUsersPage({
+          page,
+          pageSize,
+        });
+
+        this.users = result.data?.users || [];
+        this.usersTotal = result.data?.pageInfo?.total || 0;
+      } catch (error) {
+        console.error('Error fetching users page:', error);
+        showNotification('Error loading users: ' + error.message, 'error');
+      } finally {
+        this.usersLoading = false;
+      }
+    },
+
     clearData() {
       this.adminData = null;
       this.lastUpdated = null;
       this.hasLoadedOnce = false;
+      this.activityLogs = [];
+      this.activityLogsTotal = 0;
+      this.activityLogsLoading = false;
+      this.rateLimitLogs = [];
+      this.rateLimitLogsTotal = 0;
+      this.rateLimitLogsLoading = false;
+      this.errorLogs = [];
+      this.errorLogsTotal = 0;
+      this.errorLogsLoading = false;
+      this.members = [];
+      this.membersTotal = 0;
+      this.membersLoading = false;
+      this.users = [];
+      this.usersTotal = 0;
+      this.usersLoading = false;
     },
   },
 });
