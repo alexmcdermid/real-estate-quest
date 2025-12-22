@@ -64,9 +64,36 @@ export const useAdminStore = defineStore('admin', {
         const getAdminData = httpsCallable(functions, 'getAdminData');
         const result = await getAdminData();
         
-        this.adminData = result.data;
-        this.lastUpdated = result.data.timestamp;
+        const data = result.data || {};
+        this.adminData = data;
+        this.lastUpdated = data.timestamp;
         this.hasLoadedOnce = true;
+
+        // Prime first-page data for all tables from the bulk response
+        this.activityLogs = data.activityLogs || [];
+        this.activityLogsTotal = data.activityLogsPageInfo?.total ??
+          (data.activityLogs ? data.activityLogs.length : 0);
+        this.activityLogsLoading = false;
+
+        this.rateLimitLogs = data.rateLimitLogs || [];
+        this.rateLimitLogsTotal = data.rateLimitLogsPageInfo?.total ??
+          (data.rateLimitLogs ? data.rateLimitLogs.length : 0);
+        this.rateLimitLogsLoading = false;
+
+        this.errorLogs = data.errorLogs || [];
+        this.errorLogsTotal = data.errorLogsPageInfo?.total ??
+          (data.errorLogs ? data.errorLogs.length : 0);
+        this.errorLogsLoading = false;
+
+        this.members = data.members || [];
+        this.membersTotal = data.membersPageInfo?.total ??
+          (data.members ? data.members.length : 0);
+        this.membersLoading = false;
+
+        this.users = data.users || [];
+        this.usersTotal = data.usersPageInfo?.total ??
+          (data.users ? data.users.length : 0);
+        this.usersLoading = false;
         
         showNotification('Admin data loaded successfully', 'success');
       } catch (error) {

@@ -90,6 +90,13 @@ const ERROR_LOG_PAGE_SIZE = 20;
 const MEMBERS_PAGE_SIZE = 20;
 const USERS_PAGE_SIZE = 20;
 
+/**
+ * Normalizes an activity log document from Firestore by converting timestamps
+ * and calculating event counts.
+ *
+ * @param {Object} doc - The Firestore document snapshot.
+ * @return {Object} The normalized activity log data.
+ */
 function normalizeActivityLogDoc(doc) {
   const log = doc.data();
   log.id = doc.id;
@@ -128,6 +135,12 @@ function normalizeActivityLogDoc(doc) {
   return log;
 }
 
+/**
+ * Normalizes a rate limit log document from Firestore by converting timestamps.
+ *
+ * @param {Object} doc - The Firestore document snapshot.
+ * @return {Object} The normalized rate limit log data.
+ */
 function normalizeRateLimitLogDoc(doc) {
   const logData = doc.data();
   logData.id = doc.id;
@@ -142,6 +155,12 @@ function normalizeRateLimitLogDoc(doc) {
   return logData;
 }
 
+/**
+ * Normalizes an error log document from Firestore by converting timestamps.
+ *
+ * @param {Object} doc - The Firestore document snapshot.
+ * @return {Object} The normalized error log data.
+ */
 function normalizeErrorLogDoc(doc) {
   const e = doc.data();
   e.id = doc.id;
@@ -1375,11 +1394,12 @@ export const getAdminData = onCall(
         let usersHasMore = false;
         let usersCursor = null;
         try {
-          const listUsersResult = await admin.auth().listUsers(USERS_PAGE_SIZE);
-          totalAuthUsers = listUsersResult.users.length;
-          usersHasMore = !!listUsersResult.pageToken;
-          usersCursor = listUsersResult.pageToken || null;
-          allUsers = listUsersResult.users.map((user) => ({
+          // First page for initial table data
+          const firstPage = await admin.auth().listUsers(USERS_PAGE_SIZE);
+          totalAuthUsers += firstPage.users.length;
+          usersHasMore = !!firstPage.pageToken;
+          usersCursor = firstPage.pageToken || null;
+          allUsers = firstPage.users.map((user) => ({
             uid: user.uid,
             email: user.email,
             displayName: user.displayName,
@@ -1388,6 +1408,14 @@ export const getAdminData = onCall(
             emailVerified: user.emailVerified,
             customClaims: user.customClaims || {},
           }));
+
+          // Count remaining users to get an accurate total
+          let pageToken = firstPage.pageToken;
+          while (pageToken) {
+            const result = await admin.auth().listUsers(1000, pageToken);
+            totalAuthUsers += result.users.length;
+            pageToken = result.pageToken;
+          }
         } catch (authError) {
           console.error("Error fetching users from Auth:", authError);
         }
@@ -1483,6 +1511,22 @@ export const getAdminData = onCall(
           users: new Set(),
         });
 
+        const [
+          activityTotalSnapshot,
+          rateLimitTotalSnapshot,
+          errorTotalSnapshot,
+          membersTotalSnapshot,
+        ] = await Promise.all([
+          db.collection("study_activity_logs").count().get(),
+          db.collection("rate_limit_logs").count().get(),
+          db.collection("function_error_logs").count().get(),
+          db.collection("members").count().get(),
+        ]);
+        const activityLogsTotal = activityTotalSnapshot.data().count;
+        const rateLimitLogsTotal = rateLimitTotalSnapshot.data().count;
+        const errorLogsTotal = errorTotalSnapshot.data().count;
+        const membersTotal = membersTotalSnapshot.data().count;
+
         // Get recent function error logs (paginated)
         let errorLogs = [];
         let errorHasMore = false;
@@ -1533,7 +1577,7 @@ export const getAdminData = onCall(
 
         // Rate limit stats
         const rateLimitStats = {
-          totalLogs: rateLimitLogs.length,
+          totalLogs: rateLimitLogsTotal,
           questionLogs: rateLimitLogs.filter((log) => log.type === "questions").length,
           flashcardLogs: rateLimitLogs.filter((log) => log.type === "flashcards").length,
           uniqueIPs: [...new Set(rateLimitLogs.map((log) => log.ip).filter(Boolean))].length,
@@ -1551,23 +1595,39 @@ export const getAdminData = onCall(
           rateLimitLogsPageInfo: {
             hasMore: rateLimitHasMore,
             cursor: rateLimitCursor,
+            page: 1,
+            pageSize: RATE_LIMIT_LOG_PAGE_SIZE,
+            total: rateLimitLogsTotal,
           },
           errorLogs,
           errorLogsPageInfo: {
             hasMore: errorHasMore,
             cursor: errorCursor,
+            page: 1,
+            pageSize: ERROR_LOG_PAGE_SIZE,
+            total: errorLogsTotal,
           },
+          activityLogs,
           activityLogsPageInfo: {
             hasMore: activityHasMore,
             cursor: activityCursor,
+            page: 1,
+            pageSize: ACTIVITY_LOG_PAGE_SIZE,
+            total: activityLogsTotal,
           },
           membersPageInfo: {
             hasMore: membersHasMore,
             cursor: membersCursor,
+            page: 1,
+            pageSize: MEMBERS_PAGE_SIZE,
+            total: membersTotal,
           },
           usersPageInfo: {
             hasMore: usersHasMore,
             cursor: usersCursor,
+            page: 1,
+            pageSize: USERS_PAGE_SIZE,
+            total: totalAuthUsers,
           },
           stats: {
             totalAuthUsers,
@@ -1589,7 +1649,6 @@ export const getAdminData = onCall(
               uniqueUsers: activityStats.users.size,
             },
           },
-          activityLogs,
           timestamp: new Date().toISOString(),
         };
       } catch (error) {
