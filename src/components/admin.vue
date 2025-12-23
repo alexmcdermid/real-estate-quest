@@ -69,28 +69,8 @@
           <v-card-text>
             <v-list density="compact">
               <v-list-item>
-                <v-list-item-title>Event Batches</v-list-item-title>
+                <v-list-item-title>Total Activity Logs</v-list-item-title>
                 <v-list-item-subtitle>{{ adminData.stats.activityStats.totalBatches }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Total Events</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.activityStats.totalEvents }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Question Events</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.activityStats.questionEvents }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Flashcard Events</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.activityStats.flashcardEvents }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Unique Visitors</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.activityStats.uniqueVisitors }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Unique Users</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.activityStats.uniqueUsers }}</v-list-item-subtitle>
               </v-list-item>
             </v-list>
           </v-card-text>

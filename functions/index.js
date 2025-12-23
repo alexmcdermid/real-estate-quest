@@ -1494,23 +1494,6 @@ export const getAdminData = onCall(
           id: lastActivityDoc.id,
         } : null;
 
-        const activityStats = activityLogs.reduce((acc, log) => {
-          acc.totalBatches += 1;
-          acc.totalEvents += log.eventCount || 0;
-          acc.questionEvents += log.counts?.questions || 0;
-          acc.flashcardEvents += log.counts?.flashcards || 0;
-          if (log.visitorId) acc.visitors.add(log.visitorId);
-          if (log.uid) acc.users.add(log.uid);
-          return acc;
-        }, {
-          totalBatches: 0,
-          totalEvents: 0,
-          questionEvents: 0,
-          flashcardEvents: 0,
-          visitors: new Set(),
-          users: new Set(),
-        });
-
         const [
           activityTotalSnapshot,
           rateLimitTotalSnapshot,
@@ -1526,6 +1509,53 @@ export const getAdminData = onCall(
         const rateLimitLogsTotal = rateLimitTotalSnapshot.data().count;
         const errorLogsTotal = errorTotalSnapshot.data().count;
         const membersTotal = membersTotalSnapshot.data().count;
+
+        // Activity stats: keep lightweight, based on total count only
+        const activityStats = {
+          totalBatches: activityLogsTotal,
+          totalEvents: activityLogsTotal,
+          questionEvents: 0,
+          flashcardEvents: 0,
+          uniqueVisitors: 0,
+          uniqueUsers: 0,
+        };
+
+        // Rate limit stats
+        const rateLimitStats = {
+          totalLogs: rateLimitLogsTotal,
+          questionLogs: rateLimitLogs.filter((log) => log.type === "questions").length,
+          flashcardLogs: rateLimitLogs.filter((log) => log.type === "flashcards").length,
+          uniqueIPs: [...new Set(rateLimitLogs.map((log) => log.ip).filter(Boolean))].length,
+          uniqueUsers: [...new Set(rateLimitLogs.map((log) => log.uid).filter(Boolean))].length,
+        };
+
+        try {
+          const rateLimitStatsSnapshot = await db.collection("rate_limit_logs")
+              .select("type", "ip", "uid")
+              .get();
+
+          let questionLogs = 0;
+          let flashcardLogs = 0;
+          const uniqueIPs = new Set();
+          const uniqueUsers = new Set();
+
+          rateLimitStatsSnapshot.forEach((doc) => {
+            const data = doc.data() || {};
+            if (data.type === "questions") questionLogs += 1;
+            if (data.type === "flashcards") flashcardLogs += 1;
+            if (data.ip) uniqueIPs.add(data.ip);
+            if (data.uid) uniqueUsers.add(data.uid);
+          });
+
+          rateLimitStats.totalLogs = rateLimitLogsTotal;
+          rateLimitStats.questionLogs = questionLogs;
+          rateLimitStats.flashcardLogs = flashcardLogs;
+          rateLimitStats.uniqueIPs = uniqueIPs.size;
+          rateLimitStats.uniqueUsers = uniqueUsers.size;
+        } catch (e) {
+          console.error("Failed to aggregate full rate limit stats, using page slice only", e);
+          rateLimitStats.totalLogs = rateLimitLogsTotal;
+        }
 
         // Get recent function error logs (paginated)
         let errorLogs = [];
@@ -1574,15 +1604,6 @@ export const getAdminData = onCall(
 
         // Total members is the sum of monthly + lifetime (exclude admin accounts)
         const totalMembers = monthlyMembers + lifetimeMembers;
-
-        // Rate limit stats
-        const rateLimitStats = {
-          totalLogs: rateLimitLogsTotal,
-          questionLogs: rateLimitLogs.filter((log) => log.type === "questions").length,
-          flashcardLogs: rateLimitLogs.filter((log) => log.type === "flashcards").length,
-          uniqueIPs: [...new Set(rateLimitLogs.map((log) => log.ip).filter(Boolean))].length,
-          uniqueUsers: [...new Set(rateLimitLogs.map((log) => log.uid).filter(Boolean))].length,
-        };
 
         console.log(`Admin data request completed. ` +
           `Returning ${totalAuthUsers} auth users, ${totalMembers} members ` +
@@ -1645,8 +1666,8 @@ export const getAdminData = onCall(
               totalEvents: activityStats.totalEvents,
               questionEvents: activityStats.questionEvents,
               flashcardEvents: activityStats.flashcardEvents,
-              uniqueVisitors: activityStats.visitors.size,
-              uniqueUsers: activityStats.users.size,
+              uniqueVisitors: activityStats.uniqueVisitors,
+              uniqueUsers: activityStats.uniqueUsers,
             },
           },
           timestamp: new Date().toISOString(),
