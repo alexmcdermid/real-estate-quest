@@ -69,28 +69,8 @@
           <v-card-text>
             <v-list density="compact">
               <v-list-item>
-                <v-list-item-title>Event Batches</v-list-item-title>
+                <v-list-item-title>Total Activity Logs</v-list-item-title>
                 <v-list-item-subtitle>{{ adminData.stats.activityStats.totalBatches }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Total Events</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.activityStats.totalEvents }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Question Events</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.activityStats.questionEvents }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Flashcard Events</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.activityStats.flashcardEvents }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Unique Visitors</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.activityStats.uniqueVisitors }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Unique Users</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.activityStats.uniqueUsers }}</v-list-item-subtitle>
               </v-list-item>
             </v-list>
           </v-card-text>
@@ -204,7 +184,7 @@
             <div style="display:flex; align-items:center; width:100%;">
               <div style="display:flex; align-items:center; flex:1;">
                 <v-icon left color="primary">mdi-account-group</v-icon>
-                <span>Members ({{ filteredMembers.length }})</span>
+                <span>Members ({{ membersTotal }})</span>
               </div>
               <div style="flex-shrink:0;">
                 <v-text-field
@@ -219,11 +199,17 @@
               </div>
             </div>
           </v-card-title>
-          <v-data-table
+          <v-data-table-server
             :headers="memberHeaders"
             :items="filteredMembers"
-            :search="memberSearch"
-            :items-per-page="10"
+            v-model:page="memberOptions.page"
+            v-model:items-per-page="memberOptions.itemsPerPage"
+            :items-length="membersTotal"
+            :loading="membersLoading"
+            :items-per-page-options="itemsPerPageOptions"
+            @update:options="handleMemberOptionsUpdate"
+            @update:page="(page) => handleMemberOptionsUpdate({ page, itemsPerPage: memberOptions.itemsPerPage })"
+            @update:items-per-page="(itemsPerPage) => handleMemberOptionsUpdate({ page: 1, itemsPerPage })"
             class="elevation-1"
           >
             <template v-slot:item.member="{ item }">
@@ -270,7 +256,7 @@
               <span v-if="item.resumeTime">{{ formatDate(item.resumeTime) }}</span>
               <span v-else>-</span>
             </template>
-          </v-data-table>
+          </v-data-table-server>
         </v-card>
       </v-col>
 
@@ -281,7 +267,7 @@
             <div style="display:flex; align-items:center; width:100%;">
               <div style="display:flex; align-items:center; flex:1;">
                 <v-icon left color="primary">mdi-account-multiple</v-icon>
-                <span>All Users ({{ adminData.users ? adminData.users.length : 0 }})</span>
+                <span>All Users ({{ usersTotal }})</span>
               </div>
               <div style="flex-shrink:0;">
                 <v-text-field
@@ -296,11 +282,17 @@
               </div>
             </div>
           </v-card-title>
-          <v-data-table
+          <v-data-table-server
             :headers="usersHeaders"
             :items="filteredUsers"
-            :search="usersSearch"
-            :items-per-page="10"
+            v-model:page="userOptions.page"
+            v-model:items-per-page="userOptions.itemsPerPage"
+            :items-length="usersTotal"
+            :loading="usersLoading"
+            :items-per-page-options="itemsPerPageOptions"
+            @update:options="handleUserOptionsUpdate"
+            @update:page="(page) => handleUserOptionsUpdate({ page, itemsPerPage: userOptions.itemsPerPage })"
+            @update:items-per-page="(itemsPerPage) => handleUserOptionsUpdate({ page: 1, itemsPerPage })"
             class="elevation-1"
           >
             <template v-slot:item.emailVerified="{ item }">
@@ -311,7 +303,7 @@
             <template v-slot:item.customClaims="{ item }">
               <span>{{ item.customClaims && item.customClaims.isAdmin ? 'Admin' : '' }}</span>
             </template>
-          </v-data-table>
+          </v-data-table-server>
         </v-card>
       </v-col>
 
@@ -322,7 +314,7 @@
             <div style="display:flex; align-items:center; width:100%;">
               <div style="display:flex; align-items:center; flex:1;">
                 <v-icon left color="success">mdi-chart-line</v-icon>
-                <span>Study Activity Logs ({{ filteredActivityLogs.length }})</span>
+                <span>Study Activity Logs ({{ activityLogsTotal }})</span>
               </div>
               <div style="flex-shrink:0;">
                 <v-text-field
@@ -337,11 +329,18 @@
               </div>
             </div>
           </v-card-title>
-          <v-data-table
+          <v-data-table-server
             :headers="activityHeaders"
             :items="filteredActivityLogs"
-            :search="activitySearch"
-            :items-per-page="15"
+            v-model:page="activityOptions.page"
+            v-model:items-per-page="activityOptions.itemsPerPage"
+            :items-length="activityLogsTotal"
+            :loading="activityLogsLoading"
+            :items-per-page-options="itemsPerPageOptions"
+            @update:options="handleActivityOptionsUpdate"
+            @update:page="(page) => handleActivityOptionsUpdate({ page, itemsPerPage: activityOptions.itemsPerPage })"
+            @update:items-per-page="(itemsPerPage) => handleActivityOptionsUpdate({ page: 1, itemsPerPage })"
+            item-key="id"
             class="elevation-1"
           >
             <template v-slot:item.createdAt="{ item }">
@@ -370,7 +369,7 @@
             <template v-slot:item.env="{ item }">
               <v-chip size="small" color="grey">{{ item.env || 'unknown' }}</v-chip>
             </template>
-          </v-data-table>
+          </v-data-table-server>
         </v-card>
       </v-col>
 
@@ -381,7 +380,7 @@
             <div style="display:flex; align-items:center; width:100%;">
               <div style="display:flex; align-items:center; flex:1;">
                 <v-icon left color="warning">mdi-shield-alert</v-icon>
-                <span>Rate Limit Logs ({{ filteredRateLimitLogs.length }})</span>
+                <span>Rate Limit Logs ({{ rateLimitLogsTotal }})</span>
               </div>
               <div style="flex-shrink:0;">
                 <v-text-field
@@ -396,11 +395,17 @@
               </div>
             </div>
           </v-card-title>
-          <v-data-table
+          <v-data-table-server
             :headers="rateLimitHeaders"
             :items="filteredRateLimitLogs"
-            :search="rateLimitSearch"
-            :items-per-page="15"
+            v-model:page="rateLimitOptions.page"
+            v-model:items-per-page="rateLimitOptions.itemsPerPage"
+            :items-length="rateLimitLogsTotal"
+            :loading="rateLimitLogsLoading"
+            :items-per-page-options="itemsPerPageOptions"
+            @update:options="handleRateLimitOptionsUpdate"
+            @update:page="(page) => handleRateLimitOptionsUpdate({ page, itemsPerPage: rateLimitOptions.itemsPerPage })"
+            @update:items-per-page="(itemsPerPage) => handleRateLimitOptionsUpdate({ page: 1, itemsPerPage })"
             class="elevation-1"
           >
             <template v-slot:item.type="{ item }">
@@ -421,7 +426,7 @@
             <template v-slot:item.ip="{ item }">
               <code>{{ item.ip || 'Unknown' }}</code>
             </template>
-          </v-data-table>
+          </v-data-table-server>
         </v-card>
       </v-col>
 
@@ -432,7 +437,7 @@
             <div style="display:flex; align-items:center; width:100%;">
               <div style="display:flex; align-items:center; flex:1;">
                 <v-icon left color="error">mdi-bug</v-icon>
-                <span>Error Logs ({{ filteredErrorLogs.length }})</span>
+                <span>Error Logs ({{ errorLogsTotal }})</span>
               </div>
               <div style="flex-shrink:0;">
                 <v-text-field
@@ -447,11 +452,17 @@
               </div>
             </div>
           </v-card-title>
-          <v-data-table
+          <v-data-table-server
             :headers="errorHeaders"
             :items="filteredErrorLogs"
-            :search="errorSearch"
-            :items-per-page="15"
+            v-model:page="errorOptions.page"
+            v-model:items-per-page="errorOptions.itemsPerPage"
+            :items-length="errorLogsTotal"
+            :loading="errorLogsLoading"
+            :items-per-page-options="itemsPerPageOptions"
+            @update:options="handleErrorOptionsUpdate"
+            @update:page="(page) => handleErrorOptionsUpdate({ page, itemsPerPage: errorOptions.itemsPerPage })"
+            @update:items-per-page="(itemsPerPage) => handleErrorOptionsUpdate({ page: 1, itemsPerPage })"
             @click:row="onRowClick"
             class="elevation-1"
           >
@@ -480,7 +491,7 @@
             <template v-slot:item.occurrences="{ item }">
               <v-chip size="small">{{ item.occurrences || 1 }}</v-chip>
             </template>
-          </v-data-table>
+          </v-data-table-server>
         </v-card>
       </v-col>
     </v-row>
@@ -523,7 +534,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { useAuthStore } from '@/composables/useAuth';
 import { useAdminStore } from '@/composables/useAdmin';
 import { storeToRefs } from 'pinia';
@@ -533,11 +544,40 @@ const authStore = useAuthStore();
 const { isAdmin } = storeToRefs(authStore);
 
 const adminStore = useAdminStore();
-const { adminData, loading, lastUpdated } = storeToRefs(adminStore);
+const {
+  adminData,
+  loading,
+  lastUpdated,
+  activityLogs,
+  activityLogsTotal,
+  activityLogsLoading,
+  rateLimitLogs,
+  rateLimitLogsTotal,
+  rateLimitLogsLoading,
+  errorLogs,
+  errorLogsTotal,
+  errorLogsLoading,
+  members,
+  membersTotal,
+  membersLoading,
+  users,
+  usersTotal,
+  usersLoading,
+} = storeToRefs(adminStore);
 
 const memberSearch = ref('');
 const rateLimitSearch = ref('');
 const activitySearch = ref('');
+const errorSearch = ref('');
+const usersSearch = ref('');
+
+const activityOptions = reactive({ page: 1, itemsPerPage: 20 });
+const rateLimitOptions = reactive({ page: 1, itemsPerPage: 20 });
+const errorOptions = reactive({ page: 1, itemsPerPage: 20 });
+const memberOptions = reactive({ page: 1, itemsPerPage: 20 });
+const userOptions = reactive({ page: 1, itemsPerPage: 20 });
+
+const itemsPerPageOptions = [20, 50, 100];
 
 
 // Table headers
@@ -591,27 +631,46 @@ const usersHeaders = [
   { title: 'Custom Claims', key: 'customClaims', sortable: false },
 ];
 
+function matchesSearchTerm(value, term) {
+  if (value === null || value === undefined) return false;
+  if (Array.isArray(value)) return value.some((entry) => matchesSearchTerm(entry, term));
+  if (typeof value === 'object') return Object.values(value).some((entry) => matchesSearchTerm(entry, term));
+  return String(value).toLowerCase().includes(term);
+}
+
+function filterBySearch(items, searchTerm) {
+  const list = Array.isArray(items) ? items : [];
+  const term = (searchTerm || '').toString().toLowerCase().trim();
+  if (!term) return list;
+  return list.filter((item) => matchesSearchTerm(item, term));
+}
+
 // Computed properties
-const filteredMembers = computed(() => {
-  if (!adminData.value) return [];
-  return adminData.value.members;
-});
+const filteredMembers = computed(() => filterBySearch(members.value, memberSearch.value));
 
-const filteredRateLimitLogs = computed(() => {
-  if (!adminData.value) return [];
-  return adminData.value.rateLimitLogs;
-});
+const filteredRateLimitLogs = computed(() => filterBySearch(rateLimitLogs.value, rateLimitSearch.value));
 
-const filteredActivityLogs = computed(() => {
-  if (!adminData.value) return [];
-  return adminData.value.activityLogs || [];
-});
+const filteredActivityLogs = computed(() => filterBySearch(activityLogs.value, activitySearch.value));
 
-const errorSearch = ref('');
-const filteredErrorLogs = computed(() => {
-  if (!adminData.value) return [];
-  return adminData.value.errorLogs || [];
-});
+const filteredErrorLogs = computed(() => filterBySearch(errorLogs.value, errorSearch.value));
+
+const filteredUsers = computed(() => filterBySearch(users.value, usersSearch.value));
+
+watch(
+  () => adminData.value?.timestamp,
+  () => {
+    activityOptions.page = 1;
+    activityOptions.itemsPerPage = 20;
+    rateLimitOptions.page = 1;
+    rateLimitOptions.itemsPerPage = 20;
+    errorOptions.page = 1;
+    errorOptions.itemsPerPage = 20;
+    memberOptions.page = 1;
+    memberOptions.itemsPerPage = 20;
+    userOptions.page = 1;
+    userOptions.itemsPerPage = 20;
+  },
+);
 
 const errorDialog = ref({ show: false, item: null });
 
@@ -641,11 +700,45 @@ function onRowClick(...args) {
   if (row) showErrorDetails(row);
 }
 
-const usersSearch = ref('');
-const filteredUsers = computed(() => {
-  if (!adminData.value) return [];
-  return adminData.value.users || [];
-});
+async function handleActivityOptionsUpdate(options = {}) {
+  const page = Number(options.page) || 1;
+  const itemsPerPage = Number(options.itemsPerPage) || 20;
+  activityOptions.page = page;
+  activityOptions.itemsPerPage = itemsPerPage;
+  await adminStore.fetchActivityLogsPage(page, itemsPerPage);
+}
+
+async function handleRateLimitOptionsUpdate(options = {}) {
+  const page = Number(options.page) || 1;
+  const itemsPerPage = Number(options.itemsPerPage) || 20;
+  rateLimitOptions.page = page;
+  rateLimitOptions.itemsPerPage = itemsPerPage;
+  await adminStore.fetchRateLimitLogsPage(page, itemsPerPage);
+}
+
+async function handleErrorOptionsUpdate(options = {}) {
+  const page = Number(options.page) || 1;
+  const itemsPerPage = Number(options.itemsPerPage) || 20;
+  errorOptions.page = page;
+  errorOptions.itemsPerPage = itemsPerPage;
+  await adminStore.fetchErrorLogsPage(page, itemsPerPage);
+}
+
+async function handleMemberOptionsUpdate(options = {}) {
+  const page = Number(options.page) || 1;
+  const itemsPerPage = Number(options.itemsPerPage) || 20;
+  memberOptions.page = page;
+  memberOptions.itemsPerPage = itemsPerPage;
+  await adminStore.fetchMembersPage(page, itemsPerPage);
+}
+
+async function handleUserOptionsUpdate(options = {}) {
+  const page = Number(options.page) || 1;
+  const itemsPerPage = Number(options.itemsPerPage) || 20;
+  userOptions.page = page;
+  userOptions.itemsPerPage = itemsPerPage;
+  await adminStore.fetchUsersPage(page, itemsPerPage);
+}
 
 // Methods
 
@@ -711,6 +804,7 @@ onMounted(async () => {
   }
 
   await adminStore.fetchAdminData();
+
 });
 </script>
 
