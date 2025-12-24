@@ -576,6 +576,11 @@ const rateLimitOptions = reactive({ page: 1, itemsPerPage: 20 });
 const errorOptions = reactive({ page: 1, itemsPerPage: 20 });
 const memberOptions = reactive({ page: 1, itemsPerPage: 20 });
 const userOptions = reactive({ page: 1, itemsPerPage: 20 });
+let activityOptionsInitialized = false;
+let rateLimitOptionsInitialized = false;
+let errorOptionsInitialized = false;
+let memberOptionsInitialized = false;
+let userOptionsInitialized = false;
 
 const itemsPerPageOptions = [20, 50, 100];
 
@@ -669,6 +674,11 @@ watch(
     memberOptions.itemsPerPage = 20;
     userOptions.page = 1;
     userOptions.itemsPerPage = 20;
+    activityOptionsInitialized = false;
+    rateLimitOptionsInitialized = false;
+    errorOptionsInitialized = false;
+    memberOptionsInitialized = false;
+    userOptionsInitialized = false;
   },
 );
 
@@ -705,6 +715,10 @@ async function handleActivityOptionsUpdate(options = {}) {
   const itemsPerPage = Number(options.itemsPerPage) || 20;
   activityOptions.page = page;
   activityOptions.itemsPerPage = itemsPerPage;
+  if (!activityOptionsInitialized) {
+    activityOptionsInitialized = true;
+    return;
+  }
   await adminStore.fetchActivityLogsPage(page, itemsPerPage);
 }
 
@@ -713,6 +727,10 @@ async function handleRateLimitOptionsUpdate(options = {}) {
   const itemsPerPage = Number(options.itemsPerPage) || 20;
   rateLimitOptions.page = page;
   rateLimitOptions.itemsPerPage = itemsPerPage;
+  if (!rateLimitOptionsInitialized) {
+    rateLimitOptionsInitialized = true;
+    return;
+  }
   await adminStore.fetchRateLimitLogsPage(page, itemsPerPage);
 }
 
@@ -721,6 +739,10 @@ async function handleErrorOptionsUpdate(options = {}) {
   const itemsPerPage = Number(options.itemsPerPage) || 20;
   errorOptions.page = page;
   errorOptions.itemsPerPage = itemsPerPage;
+  if (!errorOptionsInitialized) {
+    errorOptionsInitialized = true;
+    return;
+  }
   await adminStore.fetchErrorLogsPage(page, itemsPerPage);
 }
 
@@ -729,6 +751,10 @@ async function handleMemberOptionsUpdate(options = {}) {
   const itemsPerPage = Number(options.itemsPerPage) || 20;
   memberOptions.page = page;
   memberOptions.itemsPerPage = itemsPerPage;
+  if (!memberOptionsInitialized) {
+    memberOptionsInitialized = true;
+    return;
+  }
   await adminStore.fetchMembersPage(page, itemsPerPage);
 }
 
@@ -737,6 +763,10 @@ async function handleUserOptionsUpdate(options = {}) {
   const itemsPerPage = Number(options.itemsPerPage) || 20;
   userOptions.page = page;
   userOptions.itemsPerPage = itemsPerPage;
+  if (!userOptionsInitialized) {
+    userOptionsInitialized = true;
+    return;
+  }
   await adminStore.fetchUsersPage(page, itemsPerPage);
 }
 
