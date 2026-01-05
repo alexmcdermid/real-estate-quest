@@ -119,13 +119,15 @@ router.beforeEach((to, from, next) => {
     }
   }
 
+  const canonicalPath = to.path !== '/' ? to.path.replace(/\/+$/, '') : '/';
+  const canonicalUrl = `https://bcrealestatequest.ca${canonicalPath}`;
   let canonicalLink = document.querySelector('link[rel="canonical"]');
   if (canonicalLink) {
-    canonicalLink.setAttribute('href', `https://bcrealestatequest.ca${to.path}`);
+    canonicalLink.setAttribute('href', canonicalUrl);
   } else {
     canonicalLink = document.createElement('link');
     canonicalLink.setAttribute('rel', 'canonical');
-    canonicalLink.setAttribute('href', `https://bcrealestatequest.ca${to.path}`);
+    canonicalLink.setAttribute('href', canonicalUrl);
     document.head.appendChild(canonicalLink);
   }
   
