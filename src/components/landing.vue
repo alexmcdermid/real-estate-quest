@@ -19,7 +19,7 @@
         <v-icon color="primary" size="48">mdi-school</v-icon>
         <h3>Practice That Matters</h3>
         <p>
-          Sharpen your knowledge with 1000+ BC real estate exam practice questions that mirror the structure and topics of the real licensing exam.
+          Sharpen your knowledge with 900+ BC real estate exam practice questions that mirror the structure and topics of the real licensing exam.
         </p>
       </v-col>
       <v-col cols="12" md="4" class="text-center">
