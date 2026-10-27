@@ -28,7 +28,7 @@ There is **one Firebase project**, the existing `real-estate-quest`. There is no
 ```mermaid
 flowchart LR
   subgraph GEN["Step 1: Generate (weekly)"]
-    G["generateAiQuestion<br/>(ai-gen codebase)"] <--> CL["Claude API"]
+    G["generateAiQuestions<br/>(ai-gen codebase)"] <--> CL["Claude API"]
   end
 
   subgraph REV["Step 2: Review"]
@@ -50,7 +50,7 @@ flowchart LR
     API["getQuestionsByChapter<br/>preloadContent"]
     STU["Student app"]
     Q --> API
-    QA -- "user toggle on" --> API
+    QA -- "if serve flag on" --> API
     API --> STU
   end
 
@@ -102,9 +102,9 @@ sequenceDiagram
   UI->>FN: getAiPendingQuestions
   FN->>F: read questionsAiPending
   FN-->>UI: pending questions
-  A->>UI: review, optionally edit
+  A->>UI: review, optionally edit, mark free or premium
   alt approve
-    UI->>FN: approveAiQuestion(id, edits)
+    UI->>FN: approveAiQuestion(id, edits, premium)
     FN->>FN: check isAdmin claim, apply edits, validate
     loop retry if the file changed underneath (max 3)
       FN->>GH: GET N.json (content + sha)
@@ -141,19 +141,26 @@ flowchart LR
 ## Serving (this repo)
 
 ```mermaid
-flowchart TD
-  CALL["getQuestionsByChapter(chapter, includeAi)<br/>or preloadContent"] --> H["load human questions<br/>(premium filter as today)"]
-  H --> T{"includeAi on?<br/>(user option)"}
-  T -- no --> OUT["return questions"]
-  T -- yes --> S{"serve flag on?<br/>(admin switch)"}
-  S -- no --> OUT
-  S -- yes --> AI["load questionsAi for chapter<br/>(same premium filter)"]
-  AI --> MERGE["append after human questions"]
-  MERGE --> OUT
-  OUT --> CLIENT["client caches per chapter and includeAi,<br/>labels them AI Question N"]
+flowchart LR
+  CALL["getQuestionsByChapter(chapter, source)<br/>or preloadContent"] --> S{"serve flag on?<br/>(admin switch)"}
+  S -- no --> OFF["human questions only<br/>(as today)"]
+  S -- yes --> P{"pro user?"}
+  P -- no --> FREE["mixed, no choice:<br/>free human + free AI"]
+  P -- yes --> SRC{"source choice<br/>(default mixed)"}
+  SRC -- mixed --> MIX["all human + all AI"]
+  SRC -- human --> HUM["all human"]
+  SRC -- ai --> AIO["all AI"]
+  OFF --> OUT["return questions"]
+  FREE --> OUT
+  MIX --> OUT
+  HUM --> OUT
+  AIO --> OUT
+  OUT --> CLIENT["client caches per chapter and source,<br/>labels AI ones AI Question N for everyone"]
 ```
 
-Every AI question is `premium: true`, so free users never get them whatever the toggle says.
+- **Pro users** choose Mixed (the default), Human only, or AI only. **Free users** get no choice: the free AI questions are simply mixed in.
+- **Mixed** means AI questions come after the human ones; the existing shuffle option mixes them together.
+- **Free vs premium** follows the human questions: the reviewer marks each AI question free or premium at approval, premium by default. Today 52 of the 940 human questions are free (about 1 in 18), from 1 in 4 in chapters 2–3 to 1 in 80 in chapters 18–19.
 
 ## Changes in this repo
 
@@ -161,22 +168,24 @@ Every AI question is `premium: true`, so free users never get them whatever the 
 
 - [ ] Pull the body of `importQuestionsFromRepo` into `importChapterFromRepo(repo, file, collection, chapter)` and have the nightly job call it for both repos.
 - [ ] New secrets: a fine-grained GitHub token with contents read/write on the AI repo only, plus the AI repo name. The existing `GITHUB_TOKEN` stays read-only.
-- [ ] Admin-only callables, checking the `isAdmin` claim like the existing admin functions: `getAiPendingQuestions`, `approveAiQuestion`, `rejectAiQuestion`, `updateAiSettings` (the `generate` and `serve` flags).
-- [ ] `getQuestionsByChapter` and `preloadContent`: accept `includeAi`, check `metadata/aiQuestions.serve`, merge.
+- [ ] Admin-only callables, checking the `isAdmin` claim like the existing admin functions: `getAiPendingQuestions`, `approveAiQuestion`, `rejectAiQuestion`, `updateAiSettings` (the `generate` and `serve` flags, and `perRun`, the number of questions per weekly run).
+- [ ] `getQuestionsByChapter` and `preloadContent`: accept `source` (`mixed`, `human` or `ai`), honour it only for pro users (free users always get mixed), check `metadata/aiQuestions.serve`, merge.
 - [ ] Give `questionsAi` the same composite indexes `questions` uses (chapter + premium + questionNumber).
 - [ ] Make sure Firestore rules deny direct client access to `questionsAiPending` and `questionsAi`; everything goes through functions.
 
 **Frontend**
 
-- [ ] Admin page ([admin.vue](../src/components/admin.vue), [useAdmin.js](../src/composables/useAdmin.js)): AI tab with the pending list, an edit form, approve/reject, the generate/serve switches, and a Generate now button.
-- [ ] Options modal ([optionModal.vue](../src/components/optionModal.vue)): an "Include AI-generated questions" switch next to "shuffled". Changing it clears the question cache.
-- [ ] [useQuestion.js](../src/composables/useQuestion.js) and [usePreload.js](../src/composables/usePreload.js): pass `includeAi` and include it in the cache key.
-- [ ] [questionCard.vue](../src/components/questionCard.vue): show "AI Question N" (or a badge) instead of "Question N", so numbers don't clash with human questions.
+- [ ] Admin page ([admin.vue](../src/components/admin.vue), [useAdmin.js](../src/composables/useAdmin.js)): AI tab with the pending list, an edit form, a free/premium choice (premium by default, showing the chapter's current split), approve/reject, the generate/serve switches, the per-run count, and a Generate now button.
+- [ ] Options modal ([optionModal.vue](../src/components/optionModal.vue)): a "Question source" choice (Mixed / Human only / AI only, default Mixed) next to "shuffled". Shown only to pro users, and only while the serve flag is on. Changing it clears the question cache.
+- [ ] [useQuestion.js](../src/composables/useQuestion.js) and [usePreload.js](../src/composables/usePreload.js): pass `source` and include it in the cache key.
+- [ ] [questionCard.vue](../src/components/questionCard.vue): show "AI Question N" (or a badge) for every user, so AI questions are always marked and numbers don't clash with human questions.
 - [ ] [useActivityTracker.js](../src/composables/useActivityTracker.js): record `aiGenerated` so stats don't merge AI question 3 with human question 3.
 - [ ] Tests for the new composable behaviour in `tests/composables/`.
 
-## Open questions
+## Decisions
 
-- Should the toggle default to on or off for pro users?
-- Mix AI questions into each chapter (as drawn above), or offer them as a separate practice set?
-- Delete rejected questions after a while, or keep them forever for duplicate avoidance?
+- **Who sees AI questions:** everyone, always labeled as AI. Pro users choose Mixed (default), Human only, or AI only; free users get them mixed in with no choice.
+- **Free vs premium:** the same kind of split as human questions, chosen by the reviewer at approval, premium by default.
+- **Volume:** 1–2 questions a week to start, likely 5–10 a week later. One chapter per week, using all of that chapter's questions as context.
+- **Rejected questions:** kept, so the generator keeps avoiding those topics. Even at 5–10 a week, each chapter comes up about 2–3 times a year in the 20-week rotation, so it gains at most about 25 AI questions a year, so the context stays small. Revisit if it grows.
+- **Notifications:** none. New questions just appear in the review queue on the admin page.
