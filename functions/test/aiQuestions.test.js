@@ -1,17 +1,11 @@
 import {describe, it} from "node:test";
 import assert from "node:assert/strict";
+import {parseChapterFile} from "../aiContent.js";
 import {
-  QUESTION_SOURCES,
-  resolveQuestionSource,
-  parseRequestedQuestionSource,
-  normalizeAiSettings,
+  AI_QUESTION_EDITABLE_FIELD_NAMES,
   validateAiQuestion,
-  computeContentHash,
-  parseChapterFile,
-  serializeAiChapterFile,
   appendAiQuestionToChapterFile,
-  normalizeAiChapterDocs,
-  timestampToIso,
+  normalizeAiQuestionDocs,
 } from "../aiQuestions.js";
 
 const validCandidate = {
@@ -31,87 +25,14 @@ const newApprovedQuestion = {
   aiQuestionId: "pendingQuestion123",
 };
 
-describe("resolveQuestionSource", () => {
-  it("serves human questions only while AI serving is off, whatever was requested", () => {
-    for (const isPro of [true, false]) {
-      for (const requestedQuestionSource of [...QUESTION_SOURCES, undefined, null, "bogus"]) {
-        assert.equal(resolveQuestionSource({aiQuestionsServed: false, isPro, requestedQuestionSource}), "human");
-      }
-    }
-  });
-
-  it("gives free users mixed questions with no choice", () => {
-    for (const requestedQuestionSource of [...QUESTION_SOURCES, undefined, null, "bogus"]) {
-      assert.equal(resolveQuestionSource({aiQuestionsServed: true, isPro: false, requestedQuestionSource}), "mixed");
-    }
-  });
-
-  it("gives pro users the source they asked for, defaulting to mixed", () => {
-    for (const requestedQuestionSource of QUESTION_SOURCES) {
-      assert.equal(
-          resolveQuestionSource({aiQuestionsServed: true, isPro: true, requestedQuestionSource}),
-          requestedQuestionSource,
-      );
-    }
-    for (const requestedQuestionSource of [undefined, null, "bogus", "AI"]) {
-      assert.equal(resolveQuestionSource({aiQuestionsServed: true, isPro: true, requestedQuestionSource}), "mixed");
-    }
-  });
-});
-
-describe("parseRequestedQuestionSource", () => {
-  it("defaults to mixed when no source is sent", () => {
-    assert.equal(parseRequestedQuestionSource(undefined), "mixed");
-    assert.equal(parseRequestedQuestionSource(null), "mixed");
-  });
-
-  it("returns valid sources unchanged", () => {
-    for (const questionSource of QUESTION_SOURCES) {
-      assert.equal(parseRequestedQuestionSource(questionSource), questionSource);
-    }
-  });
-
-  it("throws for anything else", () => {
-    for (const invalidQuestionSource of ["", "AI", "both", 1, true, {}, []]) {
-      assert.throws(() => parseRequestedQuestionSource(invalidQuestionSource), /questionSource must be one of/);
-    }
-  });
-});
-
-describe("normalizeAiSettings", () => {
-  it("defaults everything off with one question per run when the document is missing or empty", () => {
-    const defaultSettings = {generationEnabled: false, servingEnabled: false, questionsPerRun: 1};
-    assert.deepEqual(normalizeAiSettings(undefined), defaultSettings);
-    assert.deepEqual(normalizeAiSettings(null), defaultSettings);
-    assert.deepEqual(normalizeAiSettings({}), defaultSettings);
-  });
-
-  it("only treats the boolean true as enabled", () => {
-    assert.deepEqual(
-        normalizeAiSettings({generationEnabled: true, servingEnabled: true, questionsPerRun: 5}),
-        {generationEnabled: true, servingEnabled: true, questionsPerRun: 5},
-    );
-    const truthyNonBooleans = normalizeAiSettings({generationEnabled: "true", servingEnabled: 1});
-    assert.equal(truthyNonBooleans.generationEnabled, false);
-    assert.equal(truthyNonBooleans.servingEnabled, false);
-  });
-
-  it("clamps questionsPerRun to an integer from 1 to 10", () => {
-    assert.equal(normalizeAiSettings({questionsPerRun: 0}).questionsPerRun, 1);
-    assert.equal(normalizeAiSettings({questionsPerRun: -4}).questionsPerRun, 1);
-    assert.equal(normalizeAiSettings({questionsPerRun: 11}).questionsPerRun, 10);
-    assert.equal(normalizeAiSettings({questionsPerRun: 1000}).questionsPerRun, 10);
-    assert.equal(normalizeAiSettings({questionsPerRun: 3.7}).questionsPerRun, 3);
-    assert.equal(normalizeAiSettings({questionsPerRun: "4"}).questionsPerRun, 4);
-    assert.equal(normalizeAiSettings({questionsPerRun: "many"}).questionsPerRun, 1);
-    assert.equal(normalizeAiSettings({questionsPerRun: Number.NaN}).questionsPerRun, 1);
-    assert.equal(normalizeAiSettings({questionsPerRun: Infinity}).questionsPerRun, 1);
-  });
-});
-
 describe("validateAiQuestion", () => {
   it("accepts a valid question", () => {
     assert.deepEqual(validateAiQuestion(validCandidate), {valid: true, question: validCandidate});
+  });
+
+  it("returns exactly the fields an admin can edit, under the question key the approval reads", () => {
+    assert.deepEqual(AI_QUESTION_EDITABLE_FIELD_NAMES, ["question", "choices", "correctChoice", "explanation"]);
+    assert.deepEqual(Object.keys(validateAiQuestion(validCandidate).question), AI_QUESTION_EDITABLE_FIELD_NAMES);
   });
 
   it("returns trimmed values", () => {
@@ -200,28 +121,6 @@ describe("validateAiQuestion", () => {
   });
 });
 
-describe("computeContentHash", () => {
-  it("returns the sha256 hex digest", () => {
-    assert.equal(computeContentHash("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
-  });
-});
-
-describe("parseChapterFile and serializeAiChapterFile", () => {
-  it("round trips a chapter file", () => {
-    const questions = [{chapter: 1, questionNumber: 1, question: "Q?", choices: ["A", "B", "C", "D"]}];
-    const fileContent = serializeAiChapterFile(questions);
-    assert.equal(fileContent, JSON.stringify(questions, null, 2) + "\n");
-    assert.deepEqual(parseChapterFile(fileContent), questions);
-    assert.equal(serializeAiChapterFile(parseChapterFile(fileContent)), fileContent);
-  });
-
-  it("throws when the file is not a JSON array", () => {
-    assert.throws(() => parseChapterFile("{\"questions\": []}"), /JSON array/);
-    assert.throws(() => parseChapterFile("null"), /JSON array/);
-    assert.throws(() => parseChapterFile("not json"), SyntaxError);
-  });
-});
-
 describe("appendAiQuestionToChapterFile", () => {
   it("numbers the first question of a new file 1", () => {
     const result = appendAiQuestionToChapterFile([], newApprovedQuestion);
@@ -293,7 +192,7 @@ describe("appendAiQuestionToChapterFile", () => {
   });
 });
 
-describe("normalizeAiChapterDocs", () => {
+describe("normalizeAiQuestionDocs", () => {
   const fileEntry = {
     chapter: 3,
     questionNumber: 2,
@@ -306,17 +205,17 @@ describe("normalizeAiChapterDocs", () => {
   };
 
   it("maps file entries to questionsAi documents", () => {
-    assert.deepEqual(normalizeAiChapterDocs([fileEntry], 3), [{...fileEntry, aiGenerated: true}]);
+    assert.deepEqual(normalizeAiQuestionDocs([fileEntry], 3), [{...fileEntry, aiGenerated: true}]);
   });
 
   it("always stamps aiGenerated true and the chapter being imported", () => {
-    const [questionDoc] = normalizeAiChapterDocs([{...fileEntry, chapter: 9, aiGenerated: false}], 3);
+    const [questionDoc] = normalizeAiQuestionDocs([{...fileEntry, chapter: 9, aiGenerated: false}], 3);
     assert.equal(questionDoc.chapter, 3);
     assert.equal(questionDoc.aiGenerated, true);
   });
 
   it("defaults premium to true unless the file says false", () => {
-    const [missingPremium, falsePremium, stringPremium] = normalizeAiChapterDocs([
+    const [missingPremium, falsePremium, stringPremium] = normalizeAiQuestionDocs([
       {...fileEntry, premium: undefined},
       {...fileEntry, premium: false},
       {...fileEntry, premium: "no"},
@@ -327,7 +226,7 @@ describe("normalizeAiChapterDocs", () => {
   });
 
   it("falls back to a chapter and number based aiQuestionId for questions added by hand", () => {
-    const questionDocs = normalizeAiChapterDocs([
+    const questionDocs = normalizeAiQuestionDocs([
       {...fileEntry, aiQuestionId: undefined, questionNumber: 4},
       {...fileEntry, aiQuestionId: "", questionNumber: 5},
       {...fileEntry, aiQuestionId: 12, questionNumber: "6"},
@@ -341,13 +240,13 @@ describe("normalizeAiChapterDocs", () => {
   });
 
   it("drops fields that are not part of a questionsAi document", () => {
-    const [questionDoc] = normalizeAiChapterDocs([{...fileEntry, notes: "hand edit"}], 3);
+    const [questionDoc] = normalizeAiQuestionDocs([{...fileEntry, notes: "hand edit"}], 3);
     assert.equal(questionDoc.notes, undefined);
   });
 
   it("throws when an entry is not an object", () => {
     for (const invalidEntry of [null, "question", 7, [fileEntry]]) {
-      assert.throws(() => normalizeAiChapterDocs([fileEntry, invalidEntry], 3), {message: "Entry 2 is not an object"});
+      assert.throws(() => normalizeAiQuestionDocs([fileEntry, invalidEntry], 3), {message: "Entry 2 is not an object"});
     }
   });
 
@@ -373,7 +272,7 @@ describe("normalizeAiChapterDocs", () => {
     ];
     for (const [malformedFields, expectedProblem] of malformedFieldCases) {
       assert.throws(
-          () => normalizeAiChapterDocs([fileEntry, {...fileEntry, questionNumber: 5, ...malformedFields}], 3),
+          () => normalizeAiQuestionDocs([fileEntry, {...fileEntry, questionNumber: 5, ...malformedFields}], 3),
           {message: `Entry 2 (questionNumber 5): ${expectedProblem}`},
       );
     }
@@ -382,14 +281,14 @@ describe("normalizeAiChapterDocs", () => {
   it("leaves the questionNumber out of the message when it is not a positive integer", () => {
     for (const questionNumber of [undefined, null, "", "abc", 0, -2, 1.5]) {
       assert.throws(
-          () => normalizeAiChapterDocs([{...fileEntry, questionNumber}], 3),
+          () => normalizeAiQuestionDocs([{...fileEntry, questionNumber}], 3),
           {message: "Entry 1: questionNumber must be a positive integer"},
       );
     }
   });
 
   it("lists every problem of the invalid entry", () => {
-    assert.throws(() => normalizeAiChapterDocs([{questionNumber: 4, premium: false}], 3), {
+    assert.throws(() => normalizeAiQuestionDocs([{questionNumber: 4, premium: false}], 3), {
       message: "Entry 1 (questionNumber 4): question must be a non-empty string; " +
         "choices must be an array of 4 non-empty strings; correctChoice must be an integer from 0 to 3; " +
         "explanation must be a non-empty string",
@@ -404,14 +303,14 @@ describe("normalizeAiChapterDocs", () => {
       explanation: "No \"Correct Answer: N\" prefix.",
     };
     assert.deepEqual(
-        normalizeAiChapterDocs([entryBreakingAuthoringRules], 3),
+        normalizeAiQuestionDocs([entryBreakingAuthoringRules], 3),
         [{...entryBreakingAuthoringRules, aiGenerated: true}],
     );
   });
 
   it("accepts a file an approval wrote", () => {
     const {fileContent} = appendAiQuestionToChapterFile([{...fileEntry, aiQuestionId: "earlier"}], newApprovedQuestion);
-    const questionDocs = normalizeAiChapterDocs(parseChapterFile(fileContent), 3);
+    const questionDocs = normalizeAiQuestionDocs(parseChapterFile(fileContent), 3);
     assert.deepEqual(questionDocs[1], {...newApprovedQuestion, questionNumber: 3, aiGenerated: true});
   });
 
@@ -420,27 +319,8 @@ describe("normalizeAiChapterDocs", () => {
     delete entryWithoutExplanation.explanation;
     const {fileContent} = appendAiQuestionToChapterFile([entryWithoutExplanation], newApprovedQuestion);
     assert.throws(
-        () => normalizeAiChapterDocs(parseChapterFile(fileContent), 3),
+        () => normalizeAiQuestionDocs(parseChapterFile(fileContent), 3),
         {message: "Entry 1 (questionNumber 2): explanation must be a non-empty string"},
     );
-  });
-});
-
-describe("timestampToIso", () => {
-  it("converts Firestore Timestamps through toDate", () => {
-    const firestoreTimestamp = {toDate: () => new Date("2026-10-30T12:34:56.000Z")};
-    assert.equal(timestampToIso(firestoreTimestamp), "2026-10-30T12:34:56.000Z");
-  });
-
-  it("converts Dates and parseable strings", () => {
-    assert.equal(timestampToIso(new Date("2026-01-02T03:04:05.006Z")), "2026-01-02T03:04:05.006Z");
-    assert.equal(timestampToIso("2026-01-02T03:04:05Z"), "2026-01-02T03:04:05.000Z");
-    assert.equal(timestampToIso("2026-01-02"), "2026-01-02T00:00:00.000Z");
-  });
-
-  it("returns null for anything else", () => {
-    for (const value of [null, undefined, "", "not a date", 1767225600000, {}, new Date("invalid")]) {
-      assert.equal(timestampToIso(value), null);
-    }
   });
 });
