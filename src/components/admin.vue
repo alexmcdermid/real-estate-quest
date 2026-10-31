@@ -17,7 +17,7 @@
 
     <v-tabs v-model="activeAdminTab" color="primary" class="mb-4">
       <v-tab value="dashboard">Dashboard</v-tab>
-      <v-tab value="aiQuestions">AI Questions</v-tab>
+      <v-tab value="aiContent">AI Content</v-tab>
     </v-tabs>
 
     <!-- Touch swipes are off so scrolling the wide tables sideways never switches tabs -->
@@ -506,8 +506,8 @@
       </v-window-item>
 
       <!-- Not eager, so the AI tab mounts and loads its data the first time it is opened -->
-      <v-window-item value="aiQuestions">
-        <AdminAiQuestions />
+      <v-window-item value="aiContent">
+        <AdminAiContent />
       </v-window-item>
     </v-window>
 
@@ -554,7 +554,7 @@ import { useAuthStore } from '@/composables/useAuth';
 import { useAdminStore } from '@/composables/useAdmin';
 import { storeToRefs } from 'pinia';
 import { showNotification } from '@/composables/useNotifier';
-import AdminAiQuestions from './adminAiQuestions.vue';
+import AdminAiContent from './adminAiContent.vue';
 
 const authStore = useAuthStore();
 const { isAdmin } = storeToRefs(authStore);

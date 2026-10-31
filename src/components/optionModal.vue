@@ -10,12 +10,12 @@
           hide-details
         ></v-switch>
         <v-radio-group
-          v-if="isPro && contentStatus.aiQuestionsServed"
-          v-model="options.questionSource"
-          label="Question source"
+          v-if="isPro && contentStatus.aiContentServed"
+          v-model="options.contentSource"
+          label="Question and flashcard source"
           color="primary"
           class="mt-4"
-          hint="AI questions are written by AI and reviewed before they are published."
+          hint="AI questions and flashcards are written by AI and reviewed before they are published."
           persistent-hint
         >
           <v-radio label="Mixed (human + AI)" value="mixed"></v-radio>

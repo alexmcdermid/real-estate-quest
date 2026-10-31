@@ -14,19 +14,20 @@ export function escapeHtml(text) {
 }
 
 // AI-written text is untrusted, so it is escaped before the formatting adds its own tags.
-// Human question files are trusted and rely on HTML entities such as &#8203;, so they render as written.
-function escapeHtmlIfAiGenerated(question, text) {
-  return question.aiGenerated === true ? escapeHtml(text) : text;
+// Human question and flashcard files are trusted and rely on HTML entities such as &#8203;, so they render as written.
+function escapeHtmlIfAiGenerated(contentItem, text) {
+  return contentItem.aiGenerated === true ? escapeHtml(text) : text;
 }
 
 /**
- * Formats a question's text for v-html: newlines become paragraph breaks and **text** becomes bold.
+ * Formats a question's text or a flashcard face for v-html: newlines become paragraph breaks and **text** becomes bold.
  *
- * @param {Object} question - The question (its `question` text and `aiGenerated` flag are used).
+ * @param {Object} contentItem - The question or flashcard; its `aiGenerated` flag decides whether the text is escaped.
+ * @param {string} text - The text to format: question.question, flashcard.front or flashcard.back.
  * @returns {string} - The HTML to render.
  */
-export function formatQuestionTextAsHtml(question) {
-  return escapeHtmlIfAiGenerated(question, question.question)
+export function formatContentTextAsHtml(contentItem, text) {
+  return escapeHtmlIfAiGenerated(contentItem, text)
     .replace(/\n/g, '<br><br>')
     .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
 }

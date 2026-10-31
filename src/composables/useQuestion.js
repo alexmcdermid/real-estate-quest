@@ -39,17 +39,17 @@ export function clearCache() {
 }
 
 /**
- * Cache key for one chapter's questions from one question source.
+ * Cache key for one chapter's questions from one content source.
  *
- * @param {string} questionSource - "mixed", "human" or "ai".
+ * @param {string} contentSource - "mixed", "human" or "ai".
  * @param {number|string} chapter - The chapter number.
  * @returns {string} - e.g. "questions_mixed_3".
  */
-export function questionsCacheKey(questionSource, chapter) {
-  return `questions_${questionSource}_${chapter}`;
+export function questionsCacheKey(contentSource, chapter) {
+  return `questions_${contentSource}_${chapter}`;
 }
 
-export async function fetchQuestionsByChapter(chapter = 1, questionSource = "mixed") {
+export async function fetchQuestionsByChapter(chapter = 1, contentSource = "mixed") {
   // Retrieve the entire cache from localStorage and decode it
   let cache = {};
   const cachedEncoded = localStorage.getItem(CACHE_KEY);
@@ -58,7 +58,7 @@ export async function fetchQuestionsByChapter(chapter = 1, questionSource = "mix
   }
 
   // Check if the cache for this chapter and source exists and is still fresh
-  const cacheKey = questionsCacheKey(questionSource, chapter);
+  const cacheKey = questionsCacheKey(contentSource, chapter);
   if (cache[cacheKey] && (Date.now() - cache[cacheKey].timestamp < STALE_TIME)) {
     return cache[cacheKey].questions;
   }
@@ -67,7 +67,7 @@ export async function fetchQuestionsByChapter(chapter = 1, questionSource = "mix
   const functions = getFunctions(firebaseApp, "us-west1");
   const getQuestionsByChapterCallable = httpsCallable(functions, "getQuestionsByChapter");
   try {
-    const result = await getQuestionsByChapterCallable({ chapter, questionSource });
+    const result = await getQuestionsByChapterCallable({ chapter, contentSource });
     // Update the cache object with the new data
     cache[cacheKey] = {
       timestamp: Date.now(),

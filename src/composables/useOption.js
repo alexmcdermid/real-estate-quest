@@ -5,7 +5,7 @@ import { reactive, watch } from 'vue'
 const defaultOptions = {
   shuffled: false,
   isDark: false,
-  questionSource: "mixed"
+  contentSource: "mixed"
 }
 
 const globalOptions = reactive(getOptions())

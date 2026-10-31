@@ -58,7 +58,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
-import { formatQuestionTextAsHtml, formatExplanationAsHtml } from '../utils/questionTextFormatting';
+import { formatContentTextAsHtml, formatExplanationAsHtml } from '../utils/contentTextFormatting';
 
 const props = defineProps({
   question: {
@@ -125,7 +125,7 @@ function resetQuestion() {
 }
 
 // Format line breaks and bold text in question text. AI-written text is HTML-escaped first.
-const formattedQuestion = computed(() => formatQuestionTextAsHtml(props.question));
+const formattedQuestion = computed(() => formatContentTextAsHtml(props.question, props.question.question));
 
 const formattedSharedText = computed(() => {
   return sharedText.value

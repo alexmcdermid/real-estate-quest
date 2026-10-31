@@ -108,7 +108,7 @@ import { storeToRefs } from "pinia";
 import { useRoute, useRouter } from "vue-router";
 
 import { fetchQuestionsByChapter } from "../composables/useQuestion";
-import { contentStatus, ensureContentStatusChecked, resolveQuestionSource } from "../composables/useContentStatus";
+import { contentStatus, ensureContentStatusChecked, resolveContentSource } from "../composables/useContentStatus";
 import QuestionCard from "./questionCard.vue";
 import ProCard from "./proCard.vue";
 import BlurredCtaCard from "./BlurredCtaCard.vue";
@@ -128,12 +128,12 @@ const questions = ref([]);
 const completedQuestions = ref(new Set());
 const shuffled = computed(() => options.shuffled);
 const resetAll = ref(false);
-const questionSource = computed(() => resolveQuestionSource({
-  aiQuestionsServed: contentStatus.aiQuestionsServed,
+const contentSource = computed(() => resolveContentSource({
+  aiContentServed: contentStatus.aiContentServed,
   isPro: isPro.value,
-  requestedQuestionSource: options.questionSource,
+  requestedContentSource: options.contentSource,
 }));
-let questionSourceUsedByLastLoad = null;
+let contentSourceUsedByLastLoad = null;
 
 // AI questions come last with their own numbering, so the teaser cards continue the human numbering
 const highestHumanQuestionNumber = computed(() => questions.value
@@ -200,8 +200,8 @@ async function loadQuestions() {
   try {
     // The source depends on the AI serving switch, and the check may clear stale cached questions
     await ensureContentStatusChecked();
-    questionSourceUsedByLastLoad = questionSource.value;
-    const result = await fetchQuestionsByChapter(selectedChapter.value, questionSourceUsedByLastLoad);
+    contentSourceUsedByLastLoad = contentSource.value;
+    const result = await fetchQuestionsByChapter(selectedChapter.value, contentSourceUsedByLastLoad);
     questions.value = shuffled.value ? shuffleArray([...result]) : result;
     isLoading.value = false;
   } catch (error) {
@@ -221,10 +221,10 @@ watch(shuffled, () => {
   loadQuestions();
 });
 
-watch(questionSource, (newQuestionSource) => {
+watch(contentSource, (newContentSource) => {
   // The source settles while the first load waits for auth and the content status, and that load uses the
   // latest value, so only reload once a load has picked a different source
-  if (questionSourceUsedByLastLoad === null || newQuestionSource === questionSourceUsedByLastLoad) return;
+  if (contentSourceUsedByLastLoad === null || newContentSource === contentSourceUsedByLastLoad) return;
   isLoading.value = true;
   completedQuestions.value = new Set();
   loadQuestions();

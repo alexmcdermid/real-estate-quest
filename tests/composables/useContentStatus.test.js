@@ -41,25 +41,25 @@ describe("useContentStatus", () => {
   it("clears cached content but keeps options and stores the new version when the version changed", async () => {
     const { checkContentStatus, contentStatus, encodeCache, decodeCache } = await importFreshModules();
     localStorage.setItem(CACHE_KEY, encodeCache({
-      options: { shuffled: true, questionSource: "ai" },
+      options: { shuffled: true, contentSource: "ai" },
       contentVersion: 3,
       questions_mixed_1: { timestamp: Date.now(), questions: [{ id: "q1" }] },
-      flashcards_1: { timestamp: Date.now(), flashcards: [{ id: "f1" }] },
+      flashcards_mixed_1: { timestamp: Date.now(), flashcards: [{ id: "f1" }] },
     }));
-    mockGetContentStatus.mockResolvedValue({ data: { contentVersion: 4, aiQuestionsServed: true } });
+    mockGetContentStatus.mockResolvedValue({ data: { contentVersion: 4, aiContentServed: true } });
 
     await checkContentStatus();
 
     expect(decodeCache(localStorage.getItem(CACHE_KEY))).toEqual({
-      options: { shuffled: true, questionSource: "ai" },
+      options: { shuffled: true, contentSource: "ai" },
       contentVersion: 4,
     });
-    expect(contentStatus).toEqual({ contentVersion: 4, aiQuestionsServed: true, checked: true });
+    expect(contentStatus).toEqual({ contentVersion: 4, aiContentServed: true, checked: true });
   });
 
   it("stores the version on a first visit with no cache", async () => {
     const { checkContentStatus, decodeCache } = await importFreshModules();
-    mockGetContentStatus.mockResolvedValue({ data: { contentVersion: 0, aiQuestionsServed: false } });
+    mockGetContentStatus.mockResolvedValue({ data: { contentVersion: 0, aiContentServed: false } });
 
     await checkContentStatus();
 
@@ -69,7 +69,7 @@ describe("useContentStatus", () => {
   it("gives the callable a 10 second timeout so a stalled check falls back to the cache quickly", async () => {
     const { checkContentStatus } = await importFreshModules();
     const { httpsCallable } = await import("firebase/functions");
-    mockGetContentStatus.mockResolvedValue({ data: { contentVersion: 1, aiQuestionsServed: false } });
+    mockGetContentStatus.mockResolvedValue({ data: { contentVersion: 1, aiContentServed: false } });
 
     await checkContentStatus();
 
@@ -84,7 +84,7 @@ describe("useContentStatus", () => {
       questions_human_2: { timestamp: Date.now(), questions: [{ id: "q2" }] },
     };
     localStorage.setItem(CACHE_KEY, encodeCache(cached));
-    mockGetContentStatus.mockResolvedValue({ data: { contentVersion: 7, aiQuestionsServed: false } });
+    mockGetContentStatus.mockResolvedValue({ data: { contentVersion: 7, aiContentServed: false } });
 
     await checkContentStatus();
 
@@ -92,7 +92,7 @@ describe("useContentStatus", () => {
     expect(contentStatus.checked).toBe(true);
   });
 
-  it("keeps the cache and leaves AI questions hidden when the callable fails", async () => {
+  it("keeps the cache and leaves AI content hidden when the callable fails", async () => {
     const { checkContentStatus, contentStatus, encodeCache, decodeCache } = await importFreshModules();
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const cached = {
@@ -105,7 +105,7 @@ describe("useContentStatus", () => {
     await expect(checkContentStatus()).resolves.toBeUndefined();
 
     expect(decodeCache(localStorage.getItem(CACHE_KEY))).toEqual(cached);
-    expect(contentStatus).toEqual({ contentVersion: null, aiQuestionsServed: false, checked: true });
+    expect(contentStatus).toEqual({ contentVersion: null, aiContentServed: false, checked: true });
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 
@@ -114,18 +114,18 @@ describe("useContentStatus", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const cached = { contentVersion: 2, questions_mixed_1: { timestamp: Date.now(), questions: [] } };
     localStorage.setItem(CACHE_KEY, encodeCache(cached));
-    mockGetContentStatus.mockResolvedValue({ data: { aiQuestionsServed: true } });
+    mockGetContentStatus.mockResolvedValue({ data: { aiContentServed: true } });
 
     await checkContentStatus();
 
     expect(decodeCache(localStorage.getItem(CACHE_KEY))).toEqual(cached);
-    expect(contentStatus.aiQuestionsServed).toBe(false);
+    expect(contentStatus.aiContentServed).toBe(false);
     expect(contentStatus.checked).toBe(true);
   });
 
   it("ensureContentStatusChecked calls the callable once per page load", async () => {
     const { ensureContentStatusChecked } = await importFreshModules();
-    mockGetContentStatus.mockResolvedValue({ data: { contentVersion: 1, aiQuestionsServed: true } });
+    mockGetContentStatus.mockResolvedValue({ data: { contentVersion: 1, aiContentServed: true } });
 
     await Promise.all([ensureContentStatusChecked(), ensureContentStatusChecked()]);
     await ensureContentStatusChecked();
@@ -133,12 +133,13 @@ describe("useContentStatus", () => {
     expect(mockGetContentStatus).toHaveBeenCalledTimes(1);
   });
 
-  it("resolveQuestionSource follows the serving switch, then Pro, then the saved choice", async () => {
-    const { resolveQuestionSource } = await importFreshModules();
-    const resolve = (aiQuestionsServed, isPro, requestedQuestionSource) =>
-      resolveQuestionSource({ aiQuestionsServed, isPro, requestedQuestionSource });
+  it("resolveContentSource follows the serving switch, then Pro, then the saved choice", async () => {
+    const { resolveContentSource, CONTENT_SOURCES } = await importFreshModules();
+    const resolve = (aiContentServed, isPro, requestedContentSource) =>
+      resolveContentSource({ aiContentServed, isPro, requestedContentSource });
 
-    // Serving off: human questions only, whatever the user picked
+    expect(CONTENT_SOURCES).toEqual(["mixed", "human", "ai"]);
+    // Serving off: human content only, whatever the user picked
     expect(resolve(false, true, "ai")).toBe("human");
     expect(resolve(false, false, "mixed")).toBe("human");
     // Free users get no choice

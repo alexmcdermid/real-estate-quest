@@ -9,6 +9,7 @@
     >
       <div class="flashcard-inner" :class="{ 'flipped': isFlipped }">
         <div class="flashcard-front">
+          <v-chip v-if="isAiFlashcard" size="x-small" color="primary" label class="flashcard-ai-label">AI</v-chip>
           <v-card-text>
             <div class="flashcard-content">
               <span class="flashcard-text" v-html="formattedFront"></span>
@@ -16,6 +17,7 @@
           </v-card-text>
         </div>
         <div class="flashcard-back">
+          <v-chip v-if="isAiFlashcard" size="x-small" color="primary" label class="flashcard-ai-label">AI</v-chip>
           <v-card-text>
             <div class="flashcard-content">
               <span class="flashcard-text" v-html="formattedBack"></span>
@@ -29,6 +31,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
+import { formatContentTextAsHtml } from '../utils/contentTextFormatting';
 
 const props = defineProps({
   flashcard: {
@@ -67,18 +70,13 @@ watch(() => props.resetAll, (newVal) => {
   }
 });
 
-// Format content with line breaks and bold text
-const formattedFront = computed(() => {
-  return props.flashcard.front
-    .replace(/\n/g, '<br><br>')
-    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-});
+// AI flashcards are labeled on both faces, so they never pass for a human card
+const isAiFlashcard = computed(() => props.flashcard.aiGenerated === true);
 
-const formattedBack = computed(() => {
-  return props.flashcard.back
-    .replace(/\n/g, '<br><br>')
-    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-});
+// Format content with line breaks and bold text. AI-written text is HTML-escaped first.
+const formattedFront = computed(() => formatContentTextAsHtml(props.flashcard, props.flashcard.front));
+
+const formattedBack = computed(() => formatContentTextAsHtml(props.flashcard, props.flashcard.back));
 
 // Flip the card
 function flipCard() {
@@ -134,6 +132,14 @@ function markDifficulty(level) {
 
 .flashcard-back {
   transform: rotateY(180deg);
+  z-index: 1;
+}
+
+/* Pinned to the face's corner so it never shifts the centered text */
+.flashcard-ai-label {
+  position: absolute;
+  top: 8px;
+  right: 8px;
   z-index: 1;
 }
 

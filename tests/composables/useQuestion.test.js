@@ -71,7 +71,7 @@ describe("useQuestion helpers", () => {
     expect(first).toEqual(questions);
     expect(httpsCallable).toHaveBeenCalledTimes(1);
     expect(mockCallable).toHaveBeenCalledTimes(1);
-    expect(mockCallable).toHaveBeenCalledWith({ chapter: 2, questionSource: "mixed" });
+    expect(mockCallable).toHaveBeenCalledWith({ chapter: 2, contentSource: "mixed" });
 
     const second = await fetchQuestionsByChapter(2);
     expect(second).toEqual(questions);
@@ -82,15 +82,15 @@ describe("useQuestion helpers", () => {
     const aiQuestions = [{ id: "ai1", aiGenerated: true }];
     const humanQuestions = [{ id: "h1" }];
     mockCallable
-      .mockResolvedValueOnce({ data: { questions: aiQuestions, questionSource: "ai" } })
-      .mockResolvedValueOnce({ data: { questions: humanQuestions, questionSource: "human" } });
+      .mockResolvedValueOnce({ data: { questions: aiQuestions, contentSource: "ai" } })
+      .mockResolvedValueOnce({ data: { questions: humanQuestions, contentSource: "human" } });
 
     expect(await fetchQuestionsByChapter(4, "ai")).toEqual(aiQuestions);
-    expect(mockCallable).toHaveBeenLastCalledWith({ chapter: 4, questionSource: "ai" });
+    expect(mockCallable).toHaveBeenLastCalledWith({ chapter: 4, contentSource: "ai" });
 
     // A different source for the same chapter is not served from the AI entry
     expect(await fetchQuestionsByChapter(4, "human")).toEqual(humanQuestions);
-    expect(mockCallable).toHaveBeenLastCalledWith({ chapter: 4, questionSource: "human" });
+    expect(mockCallable).toHaveBeenLastCalledWith({ chapter: 4, contentSource: "human" });
     expect(mockCallable).toHaveBeenCalledTimes(2);
 
     const stored = decodeCache(localStorage.getItem(CACHE_KEY));

@@ -3,8 +3,93 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { firebaseApp } from '@/config/firebaseConfig';
 import { showNotification } from '@/composables/useNotifier';
 
-// Same defaults as the server uses when metadata/aiQuestions is missing
-const DEFAULT_AI_SETTINGS = { generationEnabled: false, servingEnabled: false, questionsPerRun: 1 };
+// Same defaults as the server uses when metadata/aiContent is missing
+const DEFAULT_AI_SETTINGS = { generationEnabled: false, servingEnabled: false, questionsPerRun: 1, flashcardsPerRun: 1 };
+
+// What differs between reviewing a pending AI question and a pending AI flashcard
+const AI_REVIEW_CONTENT_TYPES = {
+  questions: {
+    pendingItemsStateKey: 'aiPendingQuestions',
+    chapterSplitsStateKey: 'aiQuestionChapterSplits',
+    pendingIdField: 'pendingQuestionId',
+    itemNumberField: 'questionNumber',
+    approveCallableName: 'approveAiQuestion',
+    rejectCallableName: 'rejectAiQuestion',
+    itemNameInMessages: 'AI question',
+  },
+  flashcards: {
+    pendingItemsStateKey: 'aiPendingFlashcards',
+    chapterSplitsStateKey: 'aiFlashcardChapterSplits',
+    pendingIdField: 'pendingFlashcardId',
+    itemNumberField: 'cardNumber',
+    approveCallableName: 'approveAiFlashcard',
+    rejectCallableName: 'rejectAiFlashcard',
+    itemNameInMessages: 'AI flashcard',
+  },
+};
+
+function removePendingItem(adminStore, aiReviewContentType, pendingId) {
+  const { pendingItemsStateKey } = aiReviewContentType;
+  adminStore[pendingItemsStateKey] = adminStore[pendingItemsStateKey].filter((pendingItem) => pendingItem.id !== pendingId);
+}
+
+/**
+ * Approves a pending AI question or flashcard, drops it from the queue and counts it in its chapter's split.
+ * Shows the outcome and rethrows a failure so the card can stop its spinner.
+ *
+ * @param {Object} adminStore - The admin store.
+ * @param {Object} aiReviewContentType - An entry of AI_REVIEW_CONTENT_TYPES.
+ * @param {Object} approvalRequest - The approve callable's input, e.g. { pendingQuestionId, editedQuestion, premium }.
+ * @returns {Promise<Object>} - The callable's result data.
+ */
+async function approveAiPendingItem(adminStore, aiReviewContentType, approvalRequest) {
+  const { chapterSplitsStateKey, pendingIdField, itemNumberField, approveCallableName, itemNameInMessages } = aiReviewContentType;
+  try {
+    const functions = getFunctions(firebaseApp, 'us-west1');
+    const approveCallable = httpsCallable(functions, approveCallableName);
+    const result = await approveCallable(approvalRequest);
+    const { chapter, alreadyInRepo } = result.data;
+
+    removePendingItem(adminStore, aiReviewContentType, approvalRequest[pendingIdField]);
+    // Keep the split shown on the chapter's other pending items current without a refetch
+    const chapterSplit = adminStore[chapterSplitsStateKey][chapter];
+    if (chapterSplit && !alreadyInRepo) {
+      chapterSplit.aiTotal += 1;
+      if (approvalRequest.premium === false) chapterSplit.aiFree += 1;
+    }
+
+    showNotification(`Approved as ${itemNameInMessages} ${result.data[itemNumberField]} in chapter ${chapter}`, 'success');
+    return result.data;
+  } catch (error) {
+    console.error(`Error approving ${itemNameInMessages}:`, error);
+    showNotification(`Error approving ${itemNameInMessages}: ` + error.message, 'error');
+    throw error;
+  }
+}
+
+/**
+ * Rejects a pending AI question or flashcard and drops it from the queue.
+ * Shows the outcome and rethrows a failure so the card can stop its spinner.
+ *
+ * @param {Object} adminStore - The admin store.
+ * @param {Object} aiReviewContentType - An entry of AI_REVIEW_CONTENT_TYPES.
+ * @param {Object} rejectionRequest - The reject callable's input, e.g. { pendingQuestionId, rejectionReason }.
+ */
+async function rejectAiPendingItem(adminStore, aiReviewContentType, rejectionRequest) {
+  const { pendingIdField, rejectCallableName, itemNameInMessages } = aiReviewContentType;
+  try {
+    const functions = getFunctions(firebaseApp, 'us-west1');
+    const rejectCallable = httpsCallable(functions, rejectCallableName);
+    await rejectCallable(rejectionRequest);
+
+    removePendingItem(adminStore, aiReviewContentType, rejectionRequest[pendingIdField]);
+    showNotification(`${itemNameInMessages} rejected`, 'success');
+  } catch (error) {
+    console.error(`Error rejecting ${itemNameInMessages}:`, error);
+    showNotification(`Error rejecting ${itemNameInMessages}: ` + error.message, 'error');
+    throw error;
+  }
+}
 
 export const useAdminStore = defineStore('admin', {
   state: () => ({
@@ -32,11 +117,13 @@ export const useAdminStore = defineStore('admin', {
     users: [],
     usersTotal: 0,
     usersLoading: false,
-    // AI questions
+    // AI questions and flashcards
     aiPendingQuestions: [],
+    aiPendingFlashcards: [],
     aiGenerationRuns: [],
     aiSettings: { ...DEFAULT_AI_SETTINGS },
-    aiChapterSplits: {},
+    aiQuestionChapterSplits: {},
+    aiFlashcardChapterSplits: {},
     aiLoading: false,
     aiHasLoaded: false,
   }),
@@ -229,63 +316,42 @@ export const useAdminStore = defineStore('admin', {
       }
     },
 
-    async fetchAiPendingQuestions() {
+    async fetchAiReviewQueue() {
       this.aiLoading = true;
       try {
         const functions = getFunctions(firebaseApp, 'us-west1');
-        const getAiPendingQuestions = httpsCallable(functions, 'getAiPendingQuestions');
-        const result = await getAiPendingQuestions();
+        const getAiReviewQueue = httpsCallable(functions, 'getAiReviewQueue');
+        const result = await getAiReviewQueue();
 
         this.aiPendingQuestions = result.data?.pendingQuestions || [];
+        this.aiPendingFlashcards = result.data?.pendingFlashcards || [];
         this.aiGenerationRuns = result.data?.generationRuns || [];
         this.aiSettings = result.data?.settings || { ...DEFAULT_AI_SETTINGS };
-        this.aiChapterSplits = result.data?.chapterSplits || {};
+        this.aiQuestionChapterSplits = result.data?.questionChapterSplits || {};
+        this.aiFlashcardChapterSplits = result.data?.flashcardChapterSplits || {};
         this.aiHasLoaded = true;
       } catch (error) {
-        console.error('Error fetching AI questions:', error);
-        showNotification('Error loading AI questions: ' + error.message, 'error');
+        console.error('Error fetching the AI review queue:', error);
+        showNotification('Error loading AI content: ' + error.message, 'error');
       } finally {
         this.aiLoading = false;
       }
     },
 
     async approveAiQuestion({ pendingQuestionId, editedQuestion, premium }) {
-      try {
-        const functions = getFunctions(firebaseApp, 'us-west1');
-        const approveAiQuestionCallable = httpsCallable(functions, 'approveAiQuestion');
-        const result = await approveAiQuestionCallable({ pendingQuestionId, editedQuestion, premium });
-        const { chapter, questionNumber, alreadyInRepo } = result.data;
+      return approveAiPendingItem(this, AI_REVIEW_CONTENT_TYPES.questions, { pendingQuestionId, editedQuestion, premium });
+    },
 
-        this.aiPendingQuestions = this.aiPendingQuestions.filter((pendingQuestion) => pendingQuestion.id !== pendingQuestionId);
-        // Keep the split shown on the chapter's other pending questions current without a refetch
-        const chapterSplit = this.aiChapterSplits[chapter];
-        if (chapterSplit && !alreadyInRepo) {
-          chapterSplit.aiTotal += 1;
-          if (premium === false) chapterSplit.aiFree += 1;
-        }
-
-        showNotification(`Approved as AI question ${questionNumber} in chapter ${chapter}`, 'success');
-        return result.data;
-      } catch (error) {
-        console.error('Error approving AI question:', error);
-        showNotification('Error approving AI question: ' + error.message, 'error');
-        throw error;
-      }
+    async approveAiFlashcard({ pendingFlashcardId, editedFlashcard, premium }) {
+      return approveAiPendingItem(this, AI_REVIEW_CONTENT_TYPES.flashcards, { pendingFlashcardId, editedFlashcard, premium });
     },
 
     async rejectAiQuestion({ pendingQuestionId, rejectionReason }) {
-      try {
-        const functions = getFunctions(firebaseApp, 'us-west1');
-        const rejectAiQuestionCallable = httpsCallable(functions, 'rejectAiQuestion');
-        await rejectAiQuestionCallable({ pendingQuestionId, rejectionReason });
+      return rejectAiPendingItem(this, AI_REVIEW_CONTENT_TYPES.questions, { pendingQuestionId, rejectionReason });
+    },
 
-        this.aiPendingQuestions = this.aiPendingQuestions.filter((pendingQuestion) => pendingQuestion.id !== pendingQuestionId);
-        showNotification('AI question rejected', 'success');
-      } catch (error) {
-        console.error('Error rejecting AI question:', error);
-        showNotification('Error rejecting AI question: ' + error.message, 'error');
-        throw error;
-      }
+    async rejectAiFlashcard({ pendingFlashcardId, rejectionReason }) {
+      return rejectAiPendingItem(this, AI_REVIEW_CONTENT_TYPES.flashcards, { pendingFlashcardId, rejectionReason });
     },
 
     async updateAiSettings(settingsUpdate) {
@@ -303,21 +369,22 @@ export const useAdminStore = defineStore('admin', {
       }
     },
 
-    async generateAiQuestionsNow({ chapter, questionCount, dryRun }) {
+    // contentType "questions" or "flashcards"; chapter null = this week's chapter, itemCount null = the per-run setting
+    async generateAiContentNow({ contentType, chapter, itemCount, dryRun }) {
       try {
         const functions = getFunctions(firebaseApp, 'us-west1');
         // Wait as long as the generator function may run (1800 s); the SDK's default timeout is 70 seconds
-        const generateAiQuestionsNowCallable = httpsCallable(functions, 'generateAiQuestionsNow', { timeout: 1800000 });
-        const result = await generateAiQuestionsNowCallable({ chapter, questionCount, dryRun });
+        const generateAiContentNowCallable = httpsCallable(functions, 'generateAiContentNow', { timeout: 1800000 });
+        const result = await generateAiContentNowCallable({ contentType, chapter, itemCount, dryRun });
 
         if (!dryRun) {
-          // A live run adds pending questions and a run record
-          await this.fetchAiPendingQuestions();
+          // A live run adds pending items and a run record
+          await this.fetchAiReviewQueue();
         }
         return result.data;
       } catch (error) {
-        console.error('Error generating AI questions:', error);
-        showNotification('Error generating AI questions: ' + error.message, 'error');
+        console.error('Error generating AI content:', error);
+        showNotification('Error generating AI content: ' + error.message, 'error');
         throw error;
       }
     },
@@ -342,9 +409,11 @@ export const useAdminStore = defineStore('admin', {
       this.usersTotal = 0;
       this.usersLoading = false;
       this.aiPendingQuestions = [];
+      this.aiPendingFlashcards = [];
       this.aiGenerationRuns = [];
       this.aiSettings = { ...DEFAULT_AI_SETTINGS };
-      this.aiChapterSplits = {};
+      this.aiQuestionChapterSplits = {};
+      this.aiFlashcardChapterSplits = {};
       this.aiLoading = false;
       this.aiHasLoaded = false;
     },

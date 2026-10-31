@@ -120,6 +120,9 @@ function recordFlashcardView({ flashcard, chapter, isProUser }) {
     itemNumber: flashcard.cardNumber ?? null,
     isPremiumContent: flashcard.premium === true,
     isProUser: isProUser === true,
+    // AI and human flashcards have separate numbering, so these keep them apart in the logs
+    aiGenerated: flashcard.aiGenerated === true,
+    aiFlashcardId: typeof flashcard.aiFlashcardId === "string" ? flashcard.aiFlashcardId : null,
   });
 }
 

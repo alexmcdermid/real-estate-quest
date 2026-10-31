@@ -78,6 +78,7 @@ import { useAuthStore } from "../composables/useAuth";
 import { storeToRefs } from "pinia";
 import { useRoute, useRouter } from "vue-router";
 import { fetchFlashcardsByChapter } from "../composables/useFlashcard";
+import { contentStatus, ensureContentStatusChecked, resolveContentSource } from "../composables/useContentStatus";
 import FlashCard from "./flashCard.vue";
 import ProCard from "./proCard.vue";
 import BlurredCtaCard from "./BlurredCtaCard.vue";
@@ -97,6 +98,12 @@ const viewedFlashcards = ref(new Set());
 const shuffled = computed(() => options.shuffled);
 const resetAll = ref(false);
 const flashcardDifficulties = ref({});
+const contentSource = computed(() => resolveContentSource({
+  aiContentServed: contentStatus.aiContentServed,
+  isPro: isPro.value,
+  requestedContentSource: options.contentSource,
+}));
+let contentSourceUsedByLastLoad = null;
 
 const route = useRoute();
 const router = useRouter();
@@ -157,7 +164,10 @@ function resetAllFlashcards() {
 
 async function loadFlashcards() {
   try {
-    const result = await fetchFlashcardsByChapter(selectedChapter.value);
+    // The source depends on the AI serving switch, and the check may clear stale cached flashcards
+    await ensureContentStatusChecked();
+    contentSourceUsedByLastLoad = contentSource.value;
+    const result = await fetchFlashcardsByChapter(selectedChapter.value, contentSourceUsedByLastLoad);
     flashcards.value = shuffled.value ? shuffleArray([...result]) : result;
     isLoading.value = false;
   } catch (error) {
@@ -175,6 +185,16 @@ watch(selectedChapter, () => {
 
 watch(shuffled, () => {
   isLoading.value = true;
+  loadFlashcards();
+});
+
+watch(contentSource, (newContentSource) => {
+  // The source settles while the first load waits for auth and the content status, and that load uses the
+  // latest value, so only reload once a load has picked a different source
+  if (contentSourceUsedByLastLoad === null || newContentSource === contentSourceUsedByLastLoad) return;
+  isLoading.value = true;
+  viewedFlashcards.value = new Set();
+  flashcardDifficulties.value = {};
   loadFlashcards();
 });
 
