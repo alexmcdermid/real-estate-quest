@@ -30,6 +30,10 @@ export async function fetchFlashcardsByChapter(chapter = 1) {
   const getFlashcardsByChapterCallable = httpsCallable(functions, "getFlashCardsByChapter");
   try {
     const result = await getFlashcardsByChapterCallable({ chapter });
+    // Re-read the cache: the content version check (useContentStatus.js) may have cleared it while this
+    // request was in flight, and writing the old copy back would undo that
+    const latestCachedEncoded = localStorage.getItem(CACHE_KEY);
+    cache = latestCachedEncoded ? decodeCache(latestCachedEncoded) : {};
     // Update the cache object with the new data
     cache[flashcardsCacheKey] = {
       timestamp: Date.now(),

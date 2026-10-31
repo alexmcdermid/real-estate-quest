@@ -105,6 +105,9 @@ function recordQuestionAnswer({ question, chapter, isCorrect, selectedChoice, is
     selectedChoice: Number.isFinite(selectedChoice) ? selectedChoice : null,
     isPremiumContent: question.premium === true,
     isProUser: isProUser === true,
+    // AI and human questions have separate numbering, so these keep them apart in the logs
+    aiGenerated: question.aiGenerated === true,
+    aiQuestionId: typeof question.aiQuestionId === "string" ? question.aiQuestionId : null,
   });
 }
 

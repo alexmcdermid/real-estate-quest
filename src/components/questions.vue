@@ -65,7 +65,7 @@
                 cols="12"
                 md="6"
               >
-                <BlurredCtaCard proType="questions" :overallNumber="questions[questions.length - 1]?.questionNumber" :blurIndex="n - 1" />
+                <BlurredCtaCard proType="questions" :overallNumber="highestHumanQuestionNumber" :blurIndex="n - 1" />
               </v-col>
             </template>
             <v-col 
@@ -108,6 +108,7 @@ import { storeToRefs } from "pinia";
 import { useRoute, useRouter } from "vue-router";
 
 import { fetchQuestionsByChapter } from "../composables/useQuestion";
+import { contentStatus, ensureContentStatusChecked, resolveQuestionSource } from "../composables/useContentStatus";
 import QuestionCard from "./questionCard.vue";
 import ProCard from "./proCard.vue";
 import BlurredCtaCard from "./BlurredCtaCard.vue";
@@ -127,6 +128,17 @@ const questions = ref([]);
 const completedQuestions = ref(new Set());
 const shuffled = computed(() => options.shuffled);
 const resetAll = ref(false);
+const questionSource = computed(() => resolveQuestionSource({
+  aiQuestionsServed: contentStatus.aiQuestionsServed,
+  isPro: isPro.value,
+  requestedQuestionSource: options.questionSource,
+}));
+let questionSourceUsedByLastLoad = null;
+
+// AI questions come last with their own numbering, so the teaser cards continue the human numbering
+const highestHumanQuestionNumber = computed(() => questions.value
+  .filter((question) => question.aiGenerated !== true)
+  .reduce((highest, question) => Math.max(highest, Number(question.questionNumber) || 0), 0));
 
 const route = useRoute();
 const router = useRouter();
@@ -186,7 +198,10 @@ function resetAllQuestions() {
 
 async function loadQuestions() {
   try {
-    const result = await fetchQuestionsByChapter(selectedChapter.value);
+    // The source depends on the AI serving switch, and the check may clear stale cached questions
+    await ensureContentStatusChecked();
+    questionSourceUsedByLastLoad = questionSource.value;
+    const result = await fetchQuestionsByChapter(selectedChapter.value, questionSourceUsedByLastLoad);
     questions.value = shuffled.value ? shuffleArray([...result]) : result;
     isLoading.value = false;
   } catch (error) {
@@ -203,6 +218,15 @@ watch(selectedChapter, () => {
 
 watch(shuffled, () => {
   isLoading.value = true;
+  loadQuestions();
+});
+
+watch(questionSource, (newQuestionSource) => {
+  // The source settles while the first load waits for auth and the content status, and that load uses the
+  // latest value, so only reload once a load has picked a different source
+  if (questionSourceUsedByLastLoad === null || newQuestionSource === questionSourceUsedByLastLoad) return;
+  isLoading.value = true;
+  completedQuestions.value = new Set();
   loadQuestions();
 });
 

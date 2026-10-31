@@ -22,7 +22,7 @@ vi.mock("../../src/composables/useNotifier", () => ({
 }));
 
 import { fetchFlashcardsByChapter } from "../../src/composables/useFlashcard";
-import { decodeCache } from "../../src/composables/useQuestion";
+import { decodeCache, encodeCache } from "../../src/composables/useQuestion";
 
 describe("useFlashcard", () => {
   beforeEach(() => {
@@ -45,5 +45,25 @@ describe("useFlashcard", () => {
 
     const stored = decodeCache(localStorage.getItem(CACHE_KEY));
     expect(stored["flashcards_1"].flashcards).toEqual(flashcards);
+  });
+
+  it("does not undo a cache clear that happens while the request is in flight", async () => {
+    localStorage.setItem(CACHE_KEY, encodeCache({
+      contentVersion: 1,
+      questions_mixed_1: { timestamp: Date.now(), questions: [{ id: "stale" }] },
+    }));
+    const flashcards = [{ id: "f1" }];
+    mockCallable.mockImplementation(async () => {
+      // The content version check clears the cache and stores the new version meanwhile
+      localStorage.setItem(CACHE_KEY, encodeCache({ options: {}, contentVersion: 2 }));
+      return { data: { flashcards } };
+    });
+
+    await fetchFlashcardsByChapter(1);
+
+    const stored = decodeCache(localStorage.getItem(CACHE_KEY));
+    expect(stored.contentVersion).toBe(2);
+    expect(stored.questions_mixed_1).toBeUndefined();
+    expect(stored.flashcards_1.flashcards).toEqual(flashcards);
   });
 });

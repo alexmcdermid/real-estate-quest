@@ -15,486 +15,501 @@
       </v-col>
     </v-row>
 
-    <!-- Loading State -->
-    <v-row v-if="loading">
-      <v-col cols="12" class="text-center">
-        <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
-        <p class="mt-4">Loading admin data...</p>
-      </v-col>
-    </v-row>
+    <v-tabs v-model="activeAdminTab" color="primary" class="mb-4">
+      <v-tab value="dashboard">Dashboard</v-tab>
+      <v-tab value="aiQuestions">AI Questions</v-tab>
+    </v-tabs>
 
-    <!-- Stats Cards -->
-    <v-row v-if="!loading && adminData">
-      <!-- User Stats Card -->
-      <v-col cols="12" md="3">
-        <v-card class="mb-4" elevation="2">
-          <v-card-title class="text-h6">
-            <v-icon left color="primary">mdi-account-group</v-icon>
-            User Stats
-          </v-card-title>
-          <v-card-text>
-            <v-list density="compact">
-              <v-list-item>
-                <v-list-item-title>Total Auth Users</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.totalAuthUsers }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Total Members</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.totalMembers }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Monthly Subs</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.monthlyMembers }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Lifetime Subs</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.lifetimeMembers }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Admin Users</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.adminUsers }}</v-list-item-subtitle>
-              </v-list-item>
-            </v-list>
-          </v-card-text>
-        </v-card>
-      </v-col>
+    <!-- Touch swipes are off so scrolling the wide tables sideways never switches tabs -->
+    <v-window v-model="activeAdminTab" :touch="false">
+      <v-window-item value="dashboard">
+        <!-- Loading State -->
+        <v-row v-if="loading">
+          <v-col cols="12" class="text-center">
+            <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
+            <p class="mt-4">Loading admin data...</p>
+          </v-col>
+        </v-row>
 
-      <!-- Activity Stats Card -->
-      <v-col cols="12" md="3">
-        <v-card class="mb-4" elevation="2">
-          <v-card-title class="text-h6">
-            <v-icon left color="success">mdi-chart-areaspline</v-icon>
-            Study Activity
-          </v-card-title>
-          <v-card-text>
-            <v-list density="compact">
-              <v-list-item>
-                <v-list-item-title>Total Activity Logs</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.activityStats.totalBatches }}</v-list-item-subtitle>
-              </v-list-item>
-            </v-list>
-          </v-card-text>
-        </v-card>
-      </v-col>
-
-      <!-- Rate Limit Stats Card -->
-      <v-col cols="12" md="3">
-        <v-card class="mb-4" elevation="2">
-          <v-card-title class="text-h6">
-            <v-icon left color="warning">mdi-speedometer</v-icon>
-            Rate Limit Stats
-          </v-card-title>
-          <v-card-text>
-            <v-list density="compact">
-              <v-list-item>
-                <v-list-item-title>Total Logs</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.rateLimitStats.totalLogs }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Question Blocks</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.rateLimitStats.questionLogs }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Flashcard Blocks</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.rateLimitStats.flashcardLogs }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Unique IPs</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.rateLimitStats.uniqueIPs }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Unique Users</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.rateLimitStats.uniqueUsers }}</v-list-item-subtitle>
-              </v-list-item>
-            </v-list>
-          </v-card-text>
-        </v-card>
-      </v-col>
-
-      <!-- Content Stats Card -->
-      <v-col cols="12" md="3">
-        <v-card class="mb-4" elevation="2">
-          <v-card-title class="text-h6">
-            <v-icon left color="info">mdi-file-document-multiple</v-icon>
-            Content Stats
-          </v-card-title>
-          <v-card-text>
-            <v-list density="compact">
-              <v-list-item>
-                <v-list-item-title>Total Questions</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.contentStats.totalQuestions }}</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Total Flashcards</v-list-item-title>
-                <v-list-item-subtitle>{{ adminData.stats.contentStats.totalFlashcards }}</v-list-item-subtitle>
-              </v-list-item>
-            </v-list>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
-
-    <!-- Quick Actions -->
-    <v-row v-if="!loading && adminData">
-      <v-col cols="12" md="6">
-        <v-card class="mb-4" elevation="2">
-          <v-card-title class="text-h6">
-            <v-icon left color="success">mdi-lightning-bolt</v-icon>
-            Quick Actions
-          </v-card-title>
-          <v-card-text>
-            <v-row>
-              <v-col cols="6">
-                <v-btn 
-                  color="primary" 
-                  variant="outlined" 
-                  block 
-                  class="mb-2"
-                  @click="refreshData"
-                  :loading="loading"
-                >
-                  <v-icon left>mdi-refresh</v-icon>
-                  Refresh Data
-                </v-btn>
-              </v-col>
-              <v-col cols="6">
-                <v-btn 
-                  color="secondary" 
-                  variant="outlined" 
-                  block 
-                  class="mb-2"
-                  @click="exportData"
-                >
-                  <v-icon left>mdi-download</v-icon>
-                  Export Data
-                </v-btn>
-              </v-col>
-            </v-row>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
-
-    <!-- Data Tables -->
-    <v-row v-if="!loading && adminData">
-      <!-- Members Table -->
-      <v-col cols="12">
-        <v-card elevation="2">
-          <v-card-title class="text-h6">
-            <div style="display:flex; align-items:center; width:100%;">
-              <div style="display:flex; align-items:center; flex:1;">
+        <!-- Stats Cards -->
+        <v-row v-if="!loading && adminData">
+          <!-- User Stats Card -->
+          <v-col cols="12" md="3">
+            <v-card class="mb-4" elevation="2">
+              <v-card-title class="text-h6">
                 <v-icon left color="primary">mdi-account-group</v-icon>
-                <span>Members ({{ membersTotal }})</span>
-              </div>
-              <div style="flex-shrink:0;">
-                <v-text-field
-                  v-model="memberSearch"
-                  append-icon="mdi-magnify"
-                  label="Search members..."
-                  single-line
-                  hide-details
-                  density="compact"
-                  class="admin-search"
-                ></v-text-field>
-              </div>
-            </div>
-          </v-card-title>
-          <v-data-table-server
-            :headers="memberHeaders"
-            :items="filteredMembers"
-            v-model:page="memberOptions.page"
-            v-model:items-per-page="memberOptions.itemsPerPage"
-            :items-length="membersTotal"
-            :loading="membersLoading"
-            :items-per-page-options="itemsPerPageOptions"
-            @update:options="handleMemberOptionsUpdate"
-            @update:page="(page) => handleMemberOptionsUpdate({ page, itemsPerPage: memberOptions.itemsPerPage })"
-            @update:items-per-page="(itemsPerPage) => handleMemberOptionsUpdate({ page: 1, itemsPerPage })"
-            class="elevation-1"
-          >
-            <template v-slot:item.member="{ item }">
-              <v-chip :color="item.member ? 'success' : 'default'" size="small">
-                {{ item.member ? 'Active' : 'Inactive' }}
-              </v-chip>
-            </template>
-            <template v-slot:item.admin="{ item }">
-              <v-chip :color="item.admin ? 'error' : 'default'" size="small">
-                {{ item.admin ? 'Admin' : 'User' }}
-              </v-chip>
-            </template>
-            <template v-slot:item.subscriptionType="{ item }">
-              <v-chip 
-                :color="getSubscriptionColor(item.subscriptionType)" 
-                size="small"
-                v-if="item.subscriptionType"
+                User Stats
+              </v-card-title>
+              <v-card-text>
+                <v-list density="compact">
+                  <v-list-item>
+                    <v-list-item-title>Total Auth Users</v-list-item-title>
+                    <v-list-item-subtitle>{{ adminData.stats.totalAuthUsers }}</v-list-item-subtitle>
+                  </v-list-item>
+                  <v-list-item>
+                    <v-list-item-title>Total Members</v-list-item-title>
+                    <v-list-item-subtitle>{{ adminData.stats.totalMembers }}</v-list-item-subtitle>
+                  </v-list-item>
+                  <v-list-item>
+                    <v-list-item-title>Monthly Subs</v-list-item-title>
+                    <v-list-item-subtitle>{{ adminData.stats.monthlyMembers }}</v-list-item-subtitle>
+                  </v-list-item>
+                  <v-list-item>
+                    <v-list-item-title>Lifetime Subs</v-list-item-title>
+                    <v-list-item-subtitle>{{ adminData.stats.lifetimeMembers }}</v-list-item-subtitle>
+                  </v-list-item>
+                  <v-list-item>
+                    <v-list-item-title>Admin Users</v-list-item-title>
+                    <v-list-item-subtitle>{{ adminData.stats.adminUsers }}</v-list-item-subtitle>
+                  </v-list-item>
+                </v-list>
+              </v-card-text>
+            </v-card>
+          </v-col>
+
+          <!-- Activity Stats Card -->
+          <v-col cols="12" md="3">
+            <v-card class="mb-4" elevation="2">
+              <v-card-title class="text-h6">
+                <v-icon left color="success">mdi-chart-areaspline</v-icon>
+                Study Activity
+              </v-card-title>
+              <v-card-text>
+                <v-list density="compact">
+                  <v-list-item>
+                    <v-list-item-title>Total Activity Logs</v-list-item-title>
+                    <v-list-item-subtitle>{{ adminData.stats.activityStats.totalBatches }}</v-list-item-subtitle>
+                  </v-list-item>
+                </v-list>
+              </v-card-text>
+            </v-card>
+          </v-col>
+
+          <!-- Rate Limit Stats Card -->
+          <v-col cols="12" md="3">
+            <v-card class="mb-4" elevation="2">
+              <v-card-title class="text-h6">
+                <v-icon left color="warning">mdi-speedometer</v-icon>
+                Rate Limit Stats
+              </v-card-title>
+              <v-card-text>
+                <v-list density="compact">
+                  <v-list-item>
+                    <v-list-item-title>Total Logs</v-list-item-title>
+                    <v-list-item-subtitle>{{ adminData.stats.rateLimitStats.totalLogs }}</v-list-item-subtitle>
+                  </v-list-item>
+                  <v-list-item>
+                    <v-list-item-title>Question Blocks</v-list-item-title>
+                    <v-list-item-subtitle>{{ adminData.stats.rateLimitStats.questionLogs }}</v-list-item-subtitle>
+                  </v-list-item>
+                  <v-list-item>
+                    <v-list-item-title>Flashcard Blocks</v-list-item-title>
+                    <v-list-item-subtitle>{{ adminData.stats.rateLimitStats.flashcardLogs }}</v-list-item-subtitle>
+                  </v-list-item>
+                  <v-list-item>
+                    <v-list-item-title>Unique IPs</v-list-item-title>
+                    <v-list-item-subtitle>{{ adminData.stats.rateLimitStats.uniqueIPs }}</v-list-item-subtitle>
+                  </v-list-item>
+                  <v-list-item>
+                    <v-list-item-title>Unique Users</v-list-item-title>
+                    <v-list-item-subtitle>{{ adminData.stats.rateLimitStats.uniqueUsers }}</v-list-item-subtitle>
+                  </v-list-item>
+                </v-list>
+              </v-card-text>
+            </v-card>
+          </v-col>
+
+          <!-- Content Stats Card -->
+          <v-col cols="12" md="3">
+            <v-card class="mb-4" elevation="2">
+              <v-card-title class="text-h6">
+                <v-icon left color="info">mdi-file-document-multiple</v-icon>
+                Content Stats
+              </v-card-title>
+              <v-card-text>
+                <v-list density="compact">
+                  <v-list-item>
+                    <v-list-item-title>Total Questions</v-list-item-title>
+                    <v-list-item-subtitle>{{ adminData.stats.contentStats.totalQuestions }}</v-list-item-subtitle>
+                  </v-list-item>
+                  <v-list-item>
+                    <v-list-item-title>Total Flashcards</v-list-item-title>
+                    <v-list-item-subtitle>{{ adminData.stats.contentStats.totalFlashcards }}</v-list-item-subtitle>
+                  </v-list-item>
+                </v-list>
+              </v-card-text>
+            </v-card>
+          </v-col>
+        </v-row>
+
+        <!-- Quick Actions -->
+        <v-row v-if="!loading && adminData">
+          <v-col cols="12" md="6">
+            <v-card class="mb-4" elevation="2">
+              <v-card-title class="text-h6">
+                <v-icon left color="success">mdi-lightning-bolt</v-icon>
+                Quick Actions
+              </v-card-title>
+              <v-card-text>
+                <v-row>
+                  <v-col cols="6">
+                    <v-btn 
+                      color="primary" 
+                      variant="outlined" 
+                      block 
+                      class="mb-2"
+                      @click="refreshData"
+                      :loading="loading"
+                    >
+                      <v-icon left>mdi-refresh</v-icon>
+                      Refresh Data
+                    </v-btn>
+                  </v-col>
+                  <v-col cols="6">
+                    <v-btn 
+                      color="secondary" 
+                      variant="outlined" 
+                      block 
+                      class="mb-2"
+                      @click="exportData"
+                    >
+                      <v-icon left>mdi-download</v-icon>
+                      Export Data
+                    </v-btn>
+                  </v-col>
+                </v-row>
+              </v-card-text>
+            </v-card>
+          </v-col>
+        </v-row>
+
+        <!-- Data Tables -->
+        <v-row v-if="!loading && adminData">
+          <!-- Members Table -->
+          <v-col cols="12">
+            <v-card elevation="2">
+              <v-card-title class="text-h6">
+                <div style="display:flex; align-items:center; width:100%;">
+                  <div style="display:flex; align-items:center; flex:1;">
+                    <v-icon left color="primary">mdi-account-group</v-icon>
+                    <span>Members ({{ membersTotal }})</span>
+                  </div>
+                  <div style="flex-shrink:0;">
+                    <v-text-field
+                      v-model="memberSearch"
+                      append-icon="mdi-magnify"
+                      label="Search members..."
+                      single-line
+                      hide-details
+                      density="compact"
+                      class="admin-search"
+                    ></v-text-field>
+                  </div>
+                </div>
+              </v-card-title>
+              <v-data-table-server
+                :headers="memberHeaders"
+                :items="filteredMembers"
+                v-model:page="memberOptions.page"
+                v-model:items-per-page="memberOptions.itemsPerPage"
+                :items-length="membersTotal"
+                :loading="membersLoading"
+                :items-per-page-options="itemsPerPageOptions"
+                @update:options="handleMemberOptionsUpdate"
+                @update:page="(page) => handleMemberOptionsUpdate({ page, itemsPerPage: memberOptions.itemsPerPage })"
+                @update:items-per-page="(itemsPerPage) => handleMemberOptionsUpdate({ page: 1, itemsPerPage })"
+                class="elevation-1"
               >
-                {{ item.subscriptionType }}
-              </v-chip>
-              <span v-else>-</span>
-            </template>
-            <template v-slot:item.customerId="{ item }">
-              <code v-if="item.customerId">{{ item.customerId }}</code>
-              <span v-else class="text-grey">-</span>
-            </template>
-            <template v-slot:item.subscriptionId="{ item }">
-              <code v-if="item.subscriptionId">{{ item.subscriptionId }}</code>
-              <span v-else class="text-grey">-</span>
-            </template>
-            <template v-slot:item.subscriptionStart="{ item }">
-              <span v-if="item.subscriptionStart">{{ formatDate(item.subscriptionStart) }}</span>
-              <span v-else>-</span>
-            </template>
-            <template v-slot:item.cancelAt="{ item }">
-              <span v-if="item.cancelAt">{{ formatDate(item.cancelAt) }}</span>
-              <span v-else>-</span>
-            </template>
-            <template v-slot:item.cancelTime="{ item }">
-              <span v-if="item.cancelTime">{{ formatDate(item.cancelTime) }}</span>
-              <span v-else>-</span>
-            </template>
-            <template v-slot:item.resumeTime="{ item }">
-              <span v-if="item.resumeTime">{{ formatDate(item.resumeTime) }}</span>
-              <span v-else>-</span>
-            </template>
-          </v-data-table-server>
-        </v-card>
-      </v-col>
+                <template v-slot:item.member="{ item }">
+                  <v-chip :color="item.member ? 'success' : 'default'" size="small">
+                    {{ item.member ? 'Active' : 'Inactive' }}
+                  </v-chip>
+                </template>
+                <template v-slot:item.admin="{ item }">
+                  <v-chip :color="item.admin ? 'error' : 'default'" size="small">
+                    {{ item.admin ? 'Admin' : 'User' }}
+                  </v-chip>
+                </template>
+                <template v-slot:item.subscriptionType="{ item }">
+                  <v-chip 
+                    :color="getSubscriptionColor(item.subscriptionType)" 
+                    size="small"
+                    v-if="item.subscriptionType"
+                  >
+                    {{ item.subscriptionType }}
+                  </v-chip>
+                  <span v-else>-</span>
+                </template>
+                <template v-slot:item.customerId="{ item }">
+                  <code v-if="item.customerId">{{ item.customerId }}</code>
+                  <span v-else class="text-grey">-</span>
+                </template>
+                <template v-slot:item.subscriptionId="{ item }">
+                  <code v-if="item.subscriptionId">{{ item.subscriptionId }}</code>
+                  <span v-else class="text-grey">-</span>
+                </template>
+                <template v-slot:item.subscriptionStart="{ item }">
+                  <span v-if="item.subscriptionStart">{{ formatDate(item.subscriptionStart) }}</span>
+                  <span v-else>-</span>
+                </template>
+                <template v-slot:item.cancelAt="{ item }">
+                  <span v-if="item.cancelAt">{{ formatDate(item.cancelAt) }}</span>
+                  <span v-else>-</span>
+                </template>
+                <template v-slot:item.cancelTime="{ item }">
+                  <span v-if="item.cancelTime">{{ formatDate(item.cancelTime) }}</span>
+                  <span v-else>-</span>
+                </template>
+                <template v-slot:item.resumeTime="{ item }">
+                  <span v-if="item.resumeTime">{{ formatDate(item.resumeTime) }}</span>
+                  <span v-else>-</span>
+                </template>
+              </v-data-table-server>
+            </v-card>
+          </v-col>
 
-      <!-- All Users Table -->
-      <v-col cols="12" class="mt-4">
-        <v-card elevation="2">
-          <v-card-title class="text-h6">
-            <div style="display:flex; align-items:center; width:100%;">
-              <div style="display:flex; align-items:center; flex:1;">
-                <v-icon left color="primary">mdi-account-multiple</v-icon>
-                <span>All Users ({{ usersTotal }})</span>
-              </div>
-              <div style="flex-shrink:0;">
-                <v-text-field
-                  v-model="usersSearch"
-                  append-icon="mdi-magnify"
-                  label="Search users..."
-                  single-line
-                  hide-details
-                  density="compact"
-                  class="admin-search"
-                ></v-text-field>
-              </div>
-            </div>
-          </v-card-title>
-          <v-data-table-server
-            :headers="usersHeaders"
-            :items="filteredUsers"
-            v-model:page="userOptions.page"
-            v-model:items-per-page="userOptions.itemsPerPage"
-            :items-length="usersTotal"
-            :loading="usersLoading"
-            :items-per-page-options="itemsPerPageOptions"
-            @update:options="handleUserOptionsUpdate"
-            @update:page="(page) => handleUserOptionsUpdate({ page, itemsPerPage: userOptions.itemsPerPage })"
-            @update:items-per-page="(itemsPerPage) => handleUserOptionsUpdate({ page: 1, itemsPerPage })"
-            class="elevation-1"
-          >
-            <template v-slot:item.emailVerified="{ item }">
-              <v-chip :color="item.emailVerified ? 'success' : 'default'" size="small">
-                {{ item.emailVerified ? 'Yes' : 'No' }}
-              </v-chip>
-            </template>
-            <template v-slot:item.customClaims="{ item }">
-              <span>{{ item.customClaims && item.customClaims.isAdmin ? 'Admin' : '' }}</span>
-            </template>
-          </v-data-table-server>
-        </v-card>
-      </v-col>
-
-      <!-- Activity Logs Table -->
-      <v-col cols="12" class="mt-4">
-        <v-card elevation="2">
-          <v-card-title class="text-h6">
-            <div style="display:flex; align-items:center; width:100%;">
-              <div style="display:flex; align-items:center; flex:1;">
-                <v-icon left color="success">mdi-chart-line</v-icon>
-                <span>Study Activity Logs ({{ activityLogsTotal }})</span>
-              </div>
-              <div style="flex-shrink:0;">
-                <v-text-field
-                  v-model="activitySearch"
-                  append-icon="mdi-magnify"
-                  label="Search activity..."
-                  single-line
-                  hide-details
-                  density="compact"
-                  class="admin-search"
-                ></v-text-field>
-              </div>
-            </div>
-          </v-card-title>
-          <v-data-table-server
-            :headers="activityHeaders"
-            :items="filteredActivityLogs"
-            v-model:page="activityOptions.page"
-            v-model:items-per-page="activityOptions.itemsPerPage"
-            :items-length="activityLogsTotal"
-            :loading="activityLogsLoading"
-            :items-per-page-options="itemsPerPageOptions"
-            @update:options="handleActivityOptionsUpdate"
-            @update:page="(page) => handleActivityOptionsUpdate({ page, itemsPerPage: activityOptions.itemsPerPage })"
-            @update:items-per-page="(itemsPerPage) => handleActivityOptionsUpdate({ page: 1, itemsPerPage })"
-            item-key="id"
-            class="elevation-1"
-          >
-            <template v-slot:item.createdAt="{ item }">
-              {{ formatDate(item.createdAt) }}
-            </template>
-            <template v-slot:item.uid="{ item }">
-              <code v-if="item.uid">{{ item.uid }}</code>
-              <span v-else class="text-grey">Anonymous</span>
-            </template>
-            <template v-slot:item.visitorId="{ item }">
-              <code v-if="item.visitorId">{{ item.visitorId }}</code>
-              <span v-else class="text-grey">-</span>
-            </template>
-            <template v-slot:item.counts="{ item }">
-              <span>Q: {{ item.counts?.questions || 0 }} / F: {{ item.counts?.flashcards || 0 }}</span>
-            </template>
-            <template v-slot:item.questionCorrect="{ item }">
-              <span v-if="item.counts?.questions">
-                ✓ {{ item.counts?.questionCorrect || 0 }} / ✕ {{ item.counts?.questionIncorrect || 0 }}
-              </span>
-              <span v-else>-</span>
-            </template>
-            <template v-slot:item.eventCount="{ item }">
-              <span>{{ item.eventCount ?? (item.counts?.total ?? ((item.counts?.questions || 0) + (item.counts?.flashcards || 0))) }}</span>
-            </template>
-            <template v-slot:item.env="{ item }">
-              <v-chip size="small" color="grey">{{ item.env || 'unknown' }}</v-chip>
-            </template>
-          </v-data-table-server>
-        </v-card>
-      </v-col>
-
-      <!-- Rate Limit Logs Table -->
-      <v-col cols="12" class="mt-4">
-        <v-card elevation="2">
-          <v-card-title class="text-h6">
-            <div style="display:flex; align-items:center; width:100%;">
-              <div style="display:flex; align-items:center; flex:1;">
-                <v-icon left color="warning">mdi-shield-alert</v-icon>
-                <span>Rate Limit Logs ({{ rateLimitLogsTotal }})</span>
-              </div>
-              <div style="flex-shrink:0;">
-                <v-text-field
-                  v-model="rateLimitSearch"
-                  append-icon="mdi-magnify"
-                  label="Search logs..."
-                  single-line
-                  hide-details
-                  density="compact"
-                  class="admin-search"
-                ></v-text-field>
-              </div>
-            </div>
-          </v-card-title>
-          <v-data-table-server
-            :headers="rateLimitHeaders"
-            :items="filteredRateLimitLogs"
-            v-model:page="rateLimitOptions.page"
-            v-model:items-per-page="rateLimitOptions.itemsPerPage"
-            :items-length="rateLimitLogsTotal"
-            :loading="rateLimitLogsLoading"
-            :items-per-page-options="itemsPerPageOptions"
-            @update:options="handleRateLimitOptionsUpdate"
-            @update:page="(page) => handleRateLimitOptionsUpdate({ page, itemsPerPage: rateLimitOptions.itemsPerPage })"
-            @update:items-per-page="(itemsPerPage) => handleRateLimitOptionsUpdate({ page: 1, itemsPerPage })"
-            class="elevation-1"
-          >
-            <template v-slot:item.type="{ item }">
-              <v-chip 
-                :color="item.type === 'questions' ? 'primary' : 'secondary'" 
-                size="small"
+          <!-- All Users Table -->
+          <v-col cols="12" class="mt-4">
+            <v-card elevation="2">
+              <v-card-title class="text-h6">
+                <div style="display:flex; align-items:center; width:100%;">
+                  <div style="display:flex; align-items:center; flex:1;">
+                    <v-icon left color="primary">mdi-account-multiple</v-icon>
+                    <span>All Users ({{ usersTotal }})</span>
+                  </div>
+                  <div style="flex-shrink:0;">
+                    <v-text-field
+                      v-model="usersSearch"
+                      append-icon="mdi-magnify"
+                      label="Search users..."
+                      single-line
+                      hide-details
+                      density="compact"
+                      class="admin-search"
+                    ></v-text-field>
+                  </div>
+                </div>
+              </v-card-title>
+              <v-data-table-server
+                :headers="usersHeaders"
+                :items="filteredUsers"
+                v-model:page="userOptions.page"
+                v-model:items-per-page="userOptions.itemsPerPage"
+                :items-length="usersTotal"
+                :loading="usersLoading"
+                :items-per-page-options="itemsPerPageOptions"
+                @update:options="handleUserOptionsUpdate"
+                @update:page="(page) => handleUserOptionsUpdate({ page, itemsPerPage: userOptions.itemsPerPage })"
+                @update:items-per-page="(itemsPerPage) => handleUserOptionsUpdate({ page: 1, itemsPerPage })"
+                class="elevation-1"
               >
-                {{ item.type }}
-              </v-chip>
-            </template>
-            <template v-slot:item.timestamp="{ item }">
-              {{ formatDate(item.timestamp) }}
-            </template>
-            <template v-slot:item.uid="{ item }">
-              <code v-if="(item.userId || item.uid)">{{ item.userId || item.uid }}</code>
-              <span v-else class="text-grey">Anonymous</span>
-            </template>
-            <template v-slot:item.ip="{ item }">
-              <code>{{ item.ip || 'Unknown' }}</code>
-            </template>
-          </v-data-table-server>
-        </v-card>
-      </v-col>
+                <template v-slot:item.emailVerified="{ item }">
+                  <v-chip :color="item.emailVerified ? 'success' : 'default'" size="small">
+                    {{ item.emailVerified ? 'Yes' : 'No' }}
+                  </v-chip>
+                </template>
+                <template v-slot:item.customClaims="{ item }">
+                  <span>{{ item.customClaims && item.customClaims.isAdmin ? 'Admin' : '' }}</span>
+                </template>
+              </v-data-table-server>
+            </v-card>
+          </v-col>
 
-      <!-- Function Error Logs Table -->
-      <v-col cols="12" class="mt-4">
-        <v-card elevation="2">
-          <v-card-title class="text-h6">
-            <div style="display:flex; align-items:center; width:100%;">
-              <div style="display:flex; align-items:center; flex:1;">
-                <v-icon left color="error">mdi-bug</v-icon>
-                <span>Error Logs ({{ errorLogsTotal }})</span>
-              </div>
-              <div style="flex-shrink:0;">
-                <v-text-field
-                  v-model="errorSearch"
-                  append-icon="mdi-magnify"
-                  label="Search errors..."
-                  single-line
-                  hide-details
-                  density="compact"
-                  class="admin-search"
-                ></v-text-field>
-              </div>
-            </div>
-          </v-card-title>
-          <v-data-table-server
-            :headers="errorHeaders"
-            :items="filteredErrorLogs"
-            v-model:page="errorOptions.page"
-            v-model:items-per-page="errorOptions.itemsPerPage"
-            :items-length="errorLogsTotal"
-            :loading="errorLogsLoading"
-            :items-per-page-options="itemsPerPageOptions"
-            @update:options="handleErrorOptionsUpdate"
-            @update:page="(page) => handleErrorOptionsUpdate({ page, itemsPerPage: errorOptions.itemsPerPage })"
-            @update:items-per-page="(itemsPerPage) => handleErrorOptionsUpdate({ page: 1, itemsPerPage })"
-            @click:row="onRowClick"
-            class="elevation-1"
-          >
-            <template v-slot:item.timestamp="{ item }">
-              {{ formatDate(item.lastSeen || item.timestamp) }}
-            </template>
-            <template v-slot:item.functionName="{ item }">
-              <v-chip color="primary" size="small">{{ item.functionName }}</v-chip>
-            </template>
-            <template v-slot:item.bucket="{ item }">
-              <v-chip size="small" :color="item.bucket === 'stripe' ? 'error' : 'grey'">{{ item.bucket || 'generic' }}</v-chip>
-            </template>
-            <template v-slot:item.message="{ item }">
-              <span>
-                {{ (item.message || '').slice(0, 120) }}
-                <span v-if="(item.message||'').length>120">...</span>
-              </span>
-            </template>
-            <template v-slot:item.authUid="{ item }">
-              <code v-if="item.authUid">{{ item.authUid }}</code>
-              <span v-else class="text-grey">-</span>
-            </template>
-            <template v-slot:item.ip="{ item }">
-              <code>{{ item.ip || 'Unknown' }}</code>
-            </template>
-            <template v-slot:item.occurrences="{ item }">
-              <v-chip size="small">{{ item.occurrences || 1 }}</v-chip>
-            </template>
-          </v-data-table-server>
-        </v-card>
-      </v-col>
-    </v-row>
+          <!-- Activity Logs Table -->
+          <v-col cols="12" class="mt-4">
+            <v-card elevation="2">
+              <v-card-title class="text-h6">
+                <div style="display:flex; align-items:center; width:100%;">
+                  <div style="display:flex; align-items:center; flex:1;">
+                    <v-icon left color="success">mdi-chart-line</v-icon>
+                    <span>Study Activity Logs ({{ activityLogsTotal }})</span>
+                  </div>
+                  <div style="flex-shrink:0;">
+                    <v-text-field
+                      v-model="activitySearch"
+                      append-icon="mdi-magnify"
+                      label="Search activity..."
+                      single-line
+                      hide-details
+                      density="compact"
+                      class="admin-search"
+                    ></v-text-field>
+                  </div>
+                </div>
+              </v-card-title>
+              <v-data-table-server
+                :headers="activityHeaders"
+                :items="filteredActivityLogs"
+                v-model:page="activityOptions.page"
+                v-model:items-per-page="activityOptions.itemsPerPage"
+                :items-length="activityLogsTotal"
+                :loading="activityLogsLoading"
+                :items-per-page-options="itemsPerPageOptions"
+                @update:options="handleActivityOptionsUpdate"
+                @update:page="(page) => handleActivityOptionsUpdate({ page, itemsPerPage: activityOptions.itemsPerPage })"
+                @update:items-per-page="(itemsPerPage) => handleActivityOptionsUpdate({ page: 1, itemsPerPage })"
+                item-key="id"
+                class="elevation-1"
+              >
+                <template v-slot:item.createdAt="{ item }">
+                  {{ formatDate(item.createdAt) }}
+                </template>
+                <template v-slot:item.uid="{ item }">
+                  <code v-if="item.uid">{{ item.uid }}</code>
+                  <span v-else class="text-grey">Anonymous</span>
+                </template>
+                <template v-slot:item.visitorId="{ item }">
+                  <code v-if="item.visitorId">{{ item.visitorId }}</code>
+                  <span v-else class="text-grey">-</span>
+                </template>
+                <template v-slot:item.counts="{ item }">
+                  <span>Q: {{ item.counts?.questions || 0 }} / F: {{ item.counts?.flashcards || 0 }}</span>
+                </template>
+                <template v-slot:item.questionCorrect="{ item }">
+                  <span v-if="item.counts?.questions">
+                    ✓ {{ item.counts?.questionCorrect || 0 }} / ✕ {{ item.counts?.questionIncorrect || 0 }}
+                  </span>
+                  <span v-else>-</span>
+                </template>
+                <template v-slot:item.eventCount="{ item }">
+                  <span>{{ item.eventCount ?? (item.counts?.total ?? ((item.counts?.questions || 0) + (item.counts?.flashcards || 0))) }}</span>
+                </template>
+                <template v-slot:item.env="{ item }">
+                  <v-chip size="small" color="grey">{{ item.env || 'unknown' }}</v-chip>
+                </template>
+              </v-data-table-server>
+            </v-card>
+          </v-col>
+
+          <!-- Rate Limit Logs Table -->
+          <v-col cols="12" class="mt-4">
+            <v-card elevation="2">
+              <v-card-title class="text-h6">
+                <div style="display:flex; align-items:center; width:100%;">
+                  <div style="display:flex; align-items:center; flex:1;">
+                    <v-icon left color="warning">mdi-shield-alert</v-icon>
+                    <span>Rate Limit Logs ({{ rateLimitLogsTotal }})</span>
+                  </div>
+                  <div style="flex-shrink:0;">
+                    <v-text-field
+                      v-model="rateLimitSearch"
+                      append-icon="mdi-magnify"
+                      label="Search logs..."
+                      single-line
+                      hide-details
+                      density="compact"
+                      class="admin-search"
+                    ></v-text-field>
+                  </div>
+                </div>
+              </v-card-title>
+              <v-data-table-server
+                :headers="rateLimitHeaders"
+                :items="filteredRateLimitLogs"
+                v-model:page="rateLimitOptions.page"
+                v-model:items-per-page="rateLimitOptions.itemsPerPage"
+                :items-length="rateLimitLogsTotal"
+                :loading="rateLimitLogsLoading"
+                :items-per-page-options="itemsPerPageOptions"
+                @update:options="handleRateLimitOptionsUpdate"
+                @update:page="(page) => handleRateLimitOptionsUpdate({ page, itemsPerPage: rateLimitOptions.itemsPerPage })"
+                @update:items-per-page="(itemsPerPage) => handleRateLimitOptionsUpdate({ page: 1, itemsPerPage })"
+                class="elevation-1"
+              >
+                <template v-slot:item.type="{ item }">
+                  <v-chip 
+                    :color="item.type === 'questions' ? 'primary' : 'secondary'" 
+                    size="small"
+                  >
+                    {{ item.type }}
+                  </v-chip>
+                </template>
+                <template v-slot:item.timestamp="{ item }">
+                  {{ formatDate(item.timestamp) }}
+                </template>
+                <template v-slot:item.uid="{ item }">
+                  <code v-if="(item.userId || item.uid)">{{ item.userId || item.uid }}</code>
+                  <span v-else class="text-grey">Anonymous</span>
+                </template>
+                <template v-slot:item.ip="{ item }">
+                  <code>{{ item.ip || 'Unknown' }}</code>
+                </template>
+              </v-data-table-server>
+            </v-card>
+          </v-col>
+
+          <!-- Function Error Logs Table -->
+          <v-col cols="12" class="mt-4">
+            <v-card elevation="2">
+              <v-card-title class="text-h6">
+                <div style="display:flex; align-items:center; width:100%;">
+                  <div style="display:flex; align-items:center; flex:1;">
+                    <v-icon left color="error">mdi-bug</v-icon>
+                    <span>Error Logs ({{ errorLogsTotal }})</span>
+                  </div>
+                  <div style="flex-shrink:0;">
+                    <v-text-field
+                      v-model="errorSearch"
+                      append-icon="mdi-magnify"
+                      label="Search errors..."
+                      single-line
+                      hide-details
+                      density="compact"
+                      class="admin-search"
+                    ></v-text-field>
+                  </div>
+                </div>
+              </v-card-title>
+              <v-data-table-server
+                :headers="errorHeaders"
+                :items="filteredErrorLogs"
+                v-model:page="errorOptions.page"
+                v-model:items-per-page="errorOptions.itemsPerPage"
+                :items-length="errorLogsTotal"
+                :loading="errorLogsLoading"
+                :items-per-page-options="itemsPerPageOptions"
+                @update:options="handleErrorOptionsUpdate"
+                @update:page="(page) => handleErrorOptionsUpdate({ page, itemsPerPage: errorOptions.itemsPerPage })"
+                @update:items-per-page="(itemsPerPage) => handleErrorOptionsUpdate({ page: 1, itemsPerPage })"
+                @click:row="onRowClick"
+                class="elevation-1"
+              >
+                <template v-slot:item.timestamp="{ item }">
+                  {{ formatDate(item.lastSeen || item.timestamp) }}
+                </template>
+                <template v-slot:item.functionName="{ item }">
+                  <v-chip color="primary" size="small">{{ item.functionName }}</v-chip>
+                </template>
+                <template v-slot:item.bucket="{ item }">
+                  <v-chip size="small" :color="item.bucket === 'stripe' ? 'error' : 'grey'">{{ item.bucket || 'generic' }}</v-chip>
+                </template>
+                <template v-slot:item.message="{ item }">
+                  <span>
+                    {{ (item.message || '').slice(0, 120) }}
+                    <span v-if="(item.message||'').length>120">...</span>
+                  </span>
+                </template>
+                <template v-slot:item.authUid="{ item }">
+                  <code v-if="item.authUid">{{ item.authUid }}</code>
+                  <span v-else class="text-grey">-</span>
+                </template>
+                <template v-slot:item.ip="{ item }">
+                  <code>{{ item.ip || 'Unknown' }}</code>
+                </template>
+                <template v-slot:item.occurrences="{ item }">
+                  <v-chip size="small">{{ item.occurrences || 1 }}</v-chip>
+                </template>
+              </v-data-table-server>
+            </v-card>
+          </v-col>
+        </v-row>
+      </v-window-item>
+
+      <!-- Not eager, so the AI tab mounts and loads its data the first time it is opened -->
+      <v-window-item value="aiQuestions">
+        <AdminAiQuestions />
+      </v-window-item>
+    </v-window>
 
     <!-- Error Details Dialog -->
     <v-dialog v-model="errorDialog.show" max-width="1200px">
@@ -539,9 +554,12 @@ import { useAuthStore } from '@/composables/useAuth';
 import { useAdminStore } from '@/composables/useAdmin';
 import { storeToRefs } from 'pinia';
 import { showNotification } from '@/composables/useNotifier';
+import AdminAiQuestions from './adminAiQuestions.vue';
 
 const authStore = useAuthStore();
 const { isAdmin } = storeToRefs(authStore);
+
+const activeAdminTab = ref('dashboard');
 
 const adminStore = useAdminStore();
 const {

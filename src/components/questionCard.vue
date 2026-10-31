@@ -1,7 +1,7 @@
 <template>
   <v-card outlined class="mb-4" :data-question-index="questionIndex">
-    <v-card-title v-if="!shuffled" class="preformatted">
-      Question {{ question.questionNumber }}
+    <v-card-title v-if="!shuffled || isAiQuestion" class="preformatted">
+      {{ questionTitle }}
     </v-card-title>
     <!-- Display shared question text if provided -->
     <v-card-subtitle v-if="sharedText">
@@ -58,6 +58,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
+import { formatQuestionTextAsHtml, formatExplanationAsHtml } from '../utils/questionTextFormatting';
 
 const props = defineProps({
   question: {
@@ -91,6 +92,13 @@ const isCorrect = computed(() => submitted.value && selectedChoice.value === pro
 // Optional shared question text.
 const sharedText = computed(() => props.question.sharedQuestionText || null);
 
+// AI questions are always labeled, so they never look like a human question number. Shuffled ones drop the number.
+const isAiQuestion = computed(() => props.question.aiGenerated === true);
+const questionTitle = computed(() => {
+  if (!isAiQuestion.value) return `Question ${props.question.questionNumber}`;
+  return props.shuffled ? 'AI Question' : `AI Question ${props.question.questionNumber}`;
+});
+
 // Watch for resetAll prop changes
 watch(() => props.resetAll, (newVal) => {
   if (newVal) {
@@ -116,12 +124,8 @@ function resetQuestion() {
   emit("questionReset", props.questionIndex);
 }
 
-// Format line breaks and bold text in question text.
-const formattedQuestion = computed(() => {
-  return props.question.question
-    .replace(/\n/g, '<br><br>')
-    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-});
+// Format line breaks and bold text in question text. AI-written text is HTML-escaped first.
+const formattedQuestion = computed(() => formatQuestionTextAsHtml(props.question));
 
 const formattedSharedText = computed(() => {
   return sharedText.value
@@ -129,9 +133,7 @@ const formattedSharedText = computed(() => {
     : '';
 });
 
-const formattedExplanation = computed(() => {
-  return props.question.explanation.replace(/\*\*(.*?)\*\*/g, '<i><b>$1</b></i>');
-});
+const formattedExplanation = computed(() => formatExplanationAsHtml(props.question));
 
 // Return the color for each answer button based on submission status.
 function getChoiceColor(index) {

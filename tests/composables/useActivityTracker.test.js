@@ -121,4 +121,28 @@ describe("useActivityTracker lifecycle flushing", () => {
     const payload = mockLogStudyActivity.mock.calls[0][0];
     expect(payload.events[0].selectedChoice).toBeNull();
   });
+
+  it("sends aiGenerated and aiQuestionId so AI and human questions stay apart", async () => {
+    const {useActivityTracker} = await import("../../src/composables/useActivityTracker");
+    const tracker = useActivityTracker();
+
+    tracker.recordQuestionAnswer({
+      question: {chapter: 3, questionNumber: 1, premium: false, aiGenerated: true, aiQuestionId: "pending123"},
+      isCorrect: true,
+      selectedChoice: 2,
+      isProUser: false,
+    });
+    tracker.recordQuestionAnswer({
+      question: {chapter: 3, questionNumber: 1, premium: false},
+      isCorrect: false,
+      selectedChoice: 0,
+      isProUser: false,
+    });
+
+    await tracker.flushPendingEvents(true);
+
+    const payload = mockLogStudyActivity.mock.calls[0][0];
+    expect(payload.events[0]).toMatchObject({itemNumber: 1, aiGenerated: true, aiQuestionId: "pending123"});
+    expect(payload.events[1]).toMatchObject({itemNumber: 1, aiGenerated: false, aiQuestionId: null});
+  });
 });

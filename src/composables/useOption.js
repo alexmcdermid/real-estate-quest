@@ -4,7 +4,8 @@ import { reactive, watch } from 'vue'
 
 const defaultOptions = {
   shuffled: false,
-  isDark: false
+  isDark: false,
+  questionSource: "mixed"
 }
 
 const globalOptions = reactive(getOptions())
@@ -27,7 +28,8 @@ export function getOptions() {
   if (cachedEncoded) {
     cache = decodeCache(cachedEncoded)
   }
-  return cache.options || { ...defaultOptions }
+  // Merge so options saved before a new option existed still get its default
+  return { ...defaultOptions, ...(cache.options || {}) }
 }
 
 export function setOptions(newOptions) {
