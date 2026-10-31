@@ -3,8 +3,22 @@ import {onCall, onRequest, HttpsError} from "firebase-functions/v2/https";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import {defineSecret} from "firebase-functions/params";
 import admin from "firebase-admin";
+import {getFirestore} from "firebase-admin/firestore";
 import crypto from "crypto";
 import Stripe from "stripe";
+import {
+  MIN_AI_QUESTIONS_PER_RUN,
+  MAX_AI_QUESTIONS_PER_RUN,
+  resolveQuestionSource,
+  parseRequestedQuestionSource,
+  normalizeAiSettings,
+  validateAiQuestion,
+  computeContentHash,
+  parseChapterFile,
+  appendAiQuestionToChapterFile,
+  normalizeAiChapterDocs,
+  timestampToIso,
+} from "./aiQuestions.js";
 /**
  * Custom rate limiter implementation using Firestore
  */
@@ -65,6 +79,8 @@ class SimpleRateLimiter {
 
 admin.initializeApp();
 const db = admin.firestore();
+// The AI generator's own database: questionsAiPending (the review queue) and generationRuns.
+const aiDb = getFirestore(admin.app(), "ai");
 
 const unauthLimiter = new SimpleRateLimiter("unauth_rate_limiter", 40, 60, db);
 const authLimiter = new SimpleRateLimiter("user_rate_limiter", 40, 60, db);
@@ -79,6 +95,10 @@ const githubToken = defineSecret("GITHUB_TOKEN");
 const githubUsername = defineSecret("GITHUB_USERNAME");
 const githubRepo = defineSecret("GITHUB_REPO");
 
+// Fine-grained token with contents read/write on the AI questions repo only. Its owner is GITHUB_USERNAME.
+const aiQuestionsGithubToken = defineSecret("AI_QUESTIONS_GITHUB_TOKEN");
+const aiQuestionsGithubRepo = defineSecret("AI_QUESTIONS_GITHUB_REPO");
+
 const isProduction = process.env.NODE_ENV === "production";
 
 // Initialize Stripe (lazy initialization in functions)
@@ -89,6 +109,16 @@ const RATE_LIMIT_LOG_PAGE_SIZE = 20;
 const ERROR_LOG_PAGE_SIZE = 20;
 const MEMBERS_PAGE_SIZE = 20;
 const USERS_PAGE_SIZE = 20;
+const AI_GENERATION_RUNS_PAGE_SIZE = 10;
+
+const QUESTION_CHAPTERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+const CHAPTER_LOCK_TTL_MS = 2 * 60 * 1000;
+const FIRESTORE_BATCH_WRITE_LIMIT = 500;
+// Keeps every GitHub call well inside the chapter lock's TTL (fetch would otherwise wait up to 5 minutes).
+const GITHUB_REQUEST_TIMEOUT_MS = 20 * 1000;
+const GITHUB_COMMIT_ATTEMPTS = 3;
+const PENDING_QUESTION_ID_MAX_LENGTH = 128;
+const REJECTION_REASON_MAX_LENGTH = 500;
 
 /**
  * Normalizes an activity log document from Firestore by converting timestamps
@@ -320,6 +350,469 @@ function payloadIsStripeError(err, meta) {
   return false;
 }
 
+/**
+ * Throws unless the caller is signed in and has the isAdmin claim.
+ *
+ * @param {object} request - The callable request.
+ * @return {string} The admin's uid.
+ */
+function requireAdmin(request) {
+  if (!request.auth?.uid) {
+    throw new HttpsError("unauthenticated", "Authentication required");
+  }
+  if (!request.auth.token?.isAdmin) {
+    throw new HttpsError("permission-denied", "Admin access required");
+  }
+  return request.auth.uid;
+}
+
+/**
+ * Reads metadata/aiQuestions with defaults applied (everything off when the document is missing).
+ *
+ * @return {Promise<object>} {generationEnabled, servingEnabled, questionsPerRun}.
+ */
+async function readAiSettings() {
+  const aiSettingsDoc = await db.collection("metadata").doc("aiQuestions").get();
+  return normalizeAiSettings(aiSettingsDoc.data());
+}
+
+/**
+ * Reads the questionSource a client asked for, rejecting unknown values.
+ *
+ * @param {any} value - request.data.questionSource.
+ * @return {string} The requested source ("mixed" when none was sent).
+ */
+function readRequestedQuestionSource(value) {
+  try {
+    return parseRequestedQuestionSource(value);
+  } catch (error) {
+    throw new HttpsError("invalid-argument", error.message);
+  }
+}
+
+/**
+ * Fetches a chapter's questions for the applied question source: human questions first, then AI questions,
+ * each sorted by questionNumber. Free users only get free questions.
+ *
+ * @param {object} params
+ * @param {number} params.chapter - The chapter number.
+ * @param {boolean} params.isPremium - Whether the caller is a pro member.
+ * @param {string} params.questionSource - The applied source, from resolveQuestionSource.
+ * @return {Promise<Array<object>>} The questions, each with its document id.
+ */
+async function fetchQuestionsForChapter({chapter, isPremium, questionSource}) {
+  let humanQuestionsQuery = db.collection("questions")
+      .where("chapter", "==", chapter);
+  if (!isPremium) {
+    humanQuestionsQuery = humanQuestionsQuery.where("premium", "==", false).orderBy("questionNumber");
+  } else {
+    humanQuestionsQuery = humanQuestionsQuery.orderBy("questionNumber");
+  }
+
+  // Equality filters only, so questionsAi needs no composite index. Sorted in memory instead.
+  let aiQuestionsQuery = db.collection("questionsAi")
+      .where("chapter", "==", chapter);
+  if (!isPremium) {
+    aiQuestionsQuery = aiQuestionsQuery.where("premium", "==", false);
+  }
+
+  const [humanQuestionsSnapshot, aiQuestionsSnapshot] = await Promise.all([
+    questionSource === "ai" ? null : humanQuestionsQuery.get(),
+    questionSource === "human" ? null : aiQuestionsQuery.get(),
+  ]);
+
+  const humanQuestions = humanQuestionsSnapshot ?
+    humanQuestionsSnapshot.docs.map((doc) => ({...doc.data(), id: doc.id})) :
+    [];
+  const aiQuestions = aiQuestionsSnapshot ?
+    aiQuestionsSnapshot.docs
+        .map((doc) => ({...doc.data(), id: doc.id}))
+        .sort((first, second) => first.questionNumber - second.questionNumber) :
+    [];
+  return [...humanQuestions, ...aiQuestions];
+}
+
+/**
+ * The metadata/content fields that make clients drop their cached questions on their next page load.
+ *
+ * @return {object} Fields to merge into metadata/content.
+ */
+function buildContentVersionBump() {
+  return {
+    contentVersion: admin.firestore.FieldValue.increment(1),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+}
+
+/**
+ * Sends a request to the GitHub contents API for one file of a repo.
+ *
+ * @param {object} params
+ * @param {string} params.repoOwner - The repo's owner.
+ * @param {string} params.repoName - The repo's name.
+ * @param {string} params.repoToken - A token with access to the repo.
+ * @param {string} params.filePath - The file's path in the repo.
+ * @param {object} [params.requestOptions] - Extra fetch options (method, headers, body).
+ * @return {Promise<Response>} The fetch response.
+ */
+function requestRepoFile({repoOwner, repoName, repoToken, filePath, requestOptions = {}}) {
+  return fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`, {
+    ...requestOptions,
+    headers: {
+      "Authorization": `token ${repoToken}`,
+      "Accept": "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "real-estate-quest-functions",
+      ...requestOptions.headers,
+    },
+    signal: AbortSignal.timeout(GITHUB_REQUEST_TIMEOUT_MS),
+  });
+}
+
+/**
+ * Describes a GitHub response for log and error messages.
+ *
+ * @param {Response} response - The fetch response.
+ * @return {Promise<string>} The status and the start of the response body.
+ */
+async function describeGithubResponse(response) {
+  const responseText = await response.text().catch(() => "");
+  return `status ${response.status}: ${responseText.slice(0, 200)}`;
+}
+
+/**
+ * Reads one file from a GitHub repo.
+ *
+ * @param {object} params
+ * @param {string} params.repoOwner - The repo's owner.
+ * @param {string} params.repoName - The repo's name.
+ * @param {string} params.repoToken - A token with read access to the repo.
+ * @param {string} params.filePath - The file's path in the repo.
+ * @return {Promise<object|null>} {content (decoded utf8), sha}, or null when the file does not exist.
+ */
+async function fetchRepoFile({repoOwner, repoName, repoToken, filePath}) {
+  const response = await requestRepoFile({repoOwner, repoName, repoToken, filePath});
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`GitHub GET ${filePath} failed with ${await describeGithubResponse(response)}`);
+  }
+  const responseBody = await response.json();
+  if (!responseBody.content) {
+    throw new Error(`GitHub GET ${filePath} returned no file content`);
+  }
+  return {content: Buffer.from(responseBody.content, "base64").toString("utf8"), sha: responseBody.sha};
+}
+
+/**
+ * Creates or updates one file in a GitHub repo.
+ *
+ * @param {object} params
+ * @param {string} params.repoOwner - The repo's owner.
+ * @param {string} params.repoName - The repo's name.
+ * @param {string} params.repoToken - A token with contents write access to the repo.
+ * @param {string} params.filePath - The file's path in the repo.
+ * @param {string} params.fileContent - The new file content.
+ * @param {string} [params.sha] - The sha of the file being replaced; left out when creating the file.
+ * @param {string} params.commitMessage - The commit message.
+ * @return {Promise<string>} "committed", or "conflict" when the file changed since it was read.
+ */
+async function putRepoFile({repoOwner, repoName, repoToken, filePath, fileContent, sha, commitMessage}) {
+  const requestBody = {
+    message: commitMessage,
+    content: Buffer.from(fileContent, "utf8").toString("base64"),
+  };
+  if (sha) requestBody.sha = sha;
+
+  const response = await requestRepoFile({
+    repoOwner,
+    repoName,
+    repoToken,
+    filePath,
+    requestOptions: {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(requestBody),
+    },
+  });
+  if (response.status === 200 || response.status === 201) return "committed";
+  // 409: the sha is stale. 422: the file was created after it was read, so a sha was required.
+  if (response.status === 409 || response.status === 422) {
+    console.warn(`GitHub PUT ${filePath} reported a conflict with ${await describeGithubResponse(response)}`);
+    return "conflict";
+  }
+  throw new Error(`GitHub PUT ${filePath} failed with ${await describeGithubResponse(response)}`);
+}
+
+/**
+ * Takes a lock document in the locks collection. Locks expire on their own, so a holder that dies
+ * can't block anyone for longer than ttlMs.
+ *
+ * @param {string} lockId - The lock's document id.
+ * @param {string} owner - Who is taking the lock (for debugging).
+ * @param {number} ttlMs - How long the lock lasts.
+ * @return {Promise<string|null>} The lock token, or null when someone else holds the lock.
+ */
+async function acquireLock(lockId, owner, ttlMs) {
+  const lockRef = db.collection("locks").doc(lockId);
+  return db.runTransaction(async (transaction) => {
+    const lockDoc = await transaction.get(lockRef);
+    const now = admin.firestore.Timestamp.now();
+    const existingExpiresAt = lockDoc.exists ? lockDoc.get("expiresAt") : null;
+    if (existingExpiresAt?.toMillis && existingExpiresAt.toMillis() > now.toMillis()) {
+      return null;
+    }
+    const lockToken = crypto.randomUUID();
+    transaction.set(lockRef, {
+      lockToken,
+      owner,
+      acquiredAt: now,
+      expiresAt: admin.firestore.Timestamp.fromMillis(now.toMillis() + ttlMs),
+    });
+    return lockToken;
+  });
+}
+
+/**
+ * Releases a lock if the caller still holds it. Never throws.
+ *
+ * @param {string} lockId - The lock's document id.
+ * @param {string} lockToken - The token acquireLock returned.
+ */
+async function releaseLock(lockId, lockToken) {
+  const lockRef = db.collection("locks").doc(lockId);
+  try {
+    await db.runTransaction(async (transaction) => {
+      const lockDoc = await transaction.get(lockRef);
+      if (lockDoc.exists && lockDoc.get("lockToken") === lockToken) {
+        transaction.delete(lockRef);
+      }
+    });
+  } catch (error) {
+    console.error(`Failed to release lock ${lockId}:`, error);
+  }
+}
+
+/**
+ * Replaces one chapter of a question collection in a single batch: deletes the chapter's documents, adds the
+ * new ones, stores the source file's hash and bumps metadata/content. Students never see a half-written chapter.
+ *
+ * @param {object} params
+ * @param {string} params.collectionName - "questions" or "questionsAi".
+ * @param {number} params.chapter - The chapter number.
+ * @param {Array<object>} params.questionDocs - The chapter's new documents.
+ * @param {string} params.fileHash - The hash of the repo file the documents came from.
+ * @return {Promise<number>} The number of documents written.
+ */
+async function replaceChapterDocuments({collectionName, chapter, questionDocs, fileHash}) {
+  const existingChapterSnapshot = await db.collection(collectionName)
+      .where("chapter", "==", chapter)
+      .get();
+  // + 2 for the hash and contentVersion writes
+  const batchWriteCount = existingChapterSnapshot.size + questionDocs.length + 2;
+  if (batchWriteCount > FIRESTORE_BATCH_WRITE_LIMIT) {
+    throw new Error(`Replacing ${collectionName} chapter ${chapter} needs ${batchWriteCount} writes, ` +
+      `more than the ${FIRESTORE_BATCH_WRITE_LIMIT} one batch allows`);
+  }
+
+  const batch = db.batch();
+  existingChapterSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
+  questionDocs.forEach((questionDoc) => batch.set(db.collection(collectionName).doc(), questionDoc));
+  batch.set(db.collection("metadata").doc(collectionName), {[`hash_${chapter}`]: fileHash}, {merge: true});
+  batch.set(db.collection("metadata").doc("content"), buildContentVersionBump(), {merge: true});
+  await batch.commit();
+  return questionDocs.length;
+}
+
+/**
+ * Imports one chapter file from a repo into its collection, holding the chapter lock throughout.
+ * The file is fetched after the lock is taken, so this always writes the newest file.
+ *
+ * @param {object} params
+ * @param {string} params.repoOwner - The repo's owner.
+ * @param {string} params.repoName - The repo's name.
+ * @param {string} params.repoToken - A token with read access to the repo.
+ * @param {string} params.filePath - The chapter file's path in the repo.
+ * @param {string} params.collectionName - "questions" or "questionsAi".
+ * @param {number} params.chapter - The chapter number.
+ * @param {boolean} params.isAiRepo - Whether the file comes from the AI questions repo.
+ * @return {Promise<object>} {chapter, status: "locked", "missing", "unchanged" or "imported", questionCount}.
+ */
+async function importChapterFromRepo({repoOwner, repoName, repoToken, filePath, collectionName, chapter, isAiRepo}) {
+  const lockId = `${collectionName}_chapter_${chapter}`;
+  const lockToken = await acquireLock(lockId, "nightly-import", CHAPTER_LOCK_TTL_MS);
+  // Skipping is safe: the holder (an approval) is already writing the newest file.
+  if (!lockToken) return {chapter, status: "locked"};
+
+  try {
+    const repoFile = await fetchRepoFile({repoOwner, repoName, repoToken, filePath});
+    if (!repoFile) return {chapter, status: "missing"};
+
+    const fileHash = computeContentHash(repoFile.content);
+    const metadataDoc = await db.collection("metadata").doc(collectionName).get();
+    if (metadataDoc.get(`hash_${chapter}`) === fileHash) return {chapter, status: "unchanged"};
+
+    const parsedQuestions = parseChapterFile(repoFile.content);
+    const questionDocs = isAiRepo ?
+      normalizeAiChapterDocs(parsedQuestions, chapter) :
+      parsedQuestions.map((question) => ({...question, chapter}));
+    const questionCount = await replaceChapterDocuments({collectionName, chapter, questionDocs, fileHash});
+    return {chapter, status: "imported", questionCount};
+  } finally {
+    await releaseLock(lockId, lockToken);
+  }
+}
+
+/**
+ * Builds the questionsAi documents for an AI chapter file during an approval, with the nightly import's checks.
+ *
+ * @param {Array} parsedChapterFile - The parsed chapter file.
+ * @param {number} chapter - The chapter number.
+ * @return {Array<object>} The questionsAi documents.
+ * @throws {HttpsError} failed-precondition when an entry is invalid, since the import would refuse the file.
+ */
+function normalizeAiChapterDocsForApproval(parsedChapterFile, chapter) {
+  try {
+    return normalizeAiChapterDocs(parsedChapterFile, chapter);
+  } catch (error) {
+    throw new HttpsError("failed-precondition", `Chapter ${chapter}'s AI file has an invalid entry: ${error.message}`);
+  }
+}
+
+/**
+ * Adds an approved question to its chapter file in the AI repo, retrying when GitHub reports a conflict.
+ * Safe to repeat: when the file already has the question's aiQuestionId, nothing is committed.
+ * Nothing is committed to a chapter file the nightly import can't import either.
+ *
+ * @param {object} params
+ * @param {string} params.repoOwner - The AI repo's owner.
+ * @param {string} params.repoName - The AI repo's name.
+ * @param {string} params.repoToken - A token with contents write access to the AI repo.
+ * @param {object} params.approvedQuestion - {chapter, question, choices, correctChoice, explanation, premium,
+ *   aiQuestionId}.
+ * @return {Promise<object>} {committedContent, questionDocs (the questionsAi documents for committedContent),
+ *   questionNumber, alreadyInRepo, entryAlreadyInRepo (only when alreadyInRepo)}.
+ */
+async function commitAiQuestionToRepo({repoOwner, repoName, repoToken, approvedQuestion}) {
+  const chapter = approvedQuestion.chapter;
+  const filePath = `${chapter}.json`;
+  for (let attempt = 1; attempt <= GITHUB_COMMIT_ATTEMPTS; attempt++) {
+    const repoFile = await fetchRepoFile({repoOwner, repoName, repoToken, filePath});
+    const existingQuestions = repoFile ? parseChapterFile(repoFile.content) : [];
+    const appendResult = appendAiQuestionToChapterFile(existingQuestions, approvedQuestion);
+    if (appendResult.alreadyInRepo) {
+      // An earlier attempt committed but did not finish; only the Firestore step is left.
+      return {
+        committedContent: repoFile.content,
+        questionDocs: normalizeAiChapterDocsForApproval(existingQuestions, chapter),
+        questionNumber: appendResult.questionNumber,
+        alreadyInRepo: true,
+        entryAlreadyInRepo: appendResult.entryAlreadyInRepo,
+      };
+    }
+
+    // Checked before the commit, so an invalid entry already in the file stops the approval with nothing committed.
+    const questionDocs = normalizeAiChapterDocsForApproval(parseChapterFile(appendResult.fileContent), chapter);
+    const putResult = await putRepoFile({
+      repoOwner,
+      repoName,
+      repoToken,
+      filePath,
+      fileContent: appendResult.fileContent,
+      sha: repoFile?.sha,
+      commitMessage: `Add AI question ${appendResult.questionNumber} to chapter ${chapter}`,
+    });
+    if (putResult === "committed") {
+      return {
+        committedContent: appendResult.fileContent,
+        questionDocs,
+        questionNumber: appendResult.questionNumber,
+        alreadyInRepo: false,
+      };
+    }
+    console.warn(`GitHub conflict on ${filePath}, attempt ${attempt} of ${GITHUB_COMMIT_ATTEMPTS}`);
+  }
+  throw new HttpsError("aborted", `GitHub reported a conflict ${GITHUB_COMMIT_ATTEMPTS} times. Try again.`);
+}
+
+/**
+ * Checks the pendingQuestionId argument of the AI review callables.
+ *
+ * @param {any} pendingQuestionId - The value the client sent.
+ * @return {string} The pending question's document id.
+ */
+function readPendingQuestionId(pendingQuestionId) {
+  if (typeof pendingQuestionId !== "string" || pendingQuestionId === "" ||
+      pendingQuestionId.length > PENDING_QUESTION_ID_MAX_LENGTH || pendingQuestionId.includes("/")) {
+    throw new HttpsError("invalid-argument", "pendingQuestionId must be a document id");
+  }
+  return pendingQuestionId;
+}
+
+/**
+ * Shapes a questionsAiPending document for the admin review list.
+ *
+ * @param {Object} doc - The Firestore document snapshot.
+ * @return {Object} The pending question.
+ */
+function normalizePendingQuestionDoc(doc) {
+  const pendingQuestion = doc.data();
+  return {
+    id: doc.id,
+    chapter: pendingQuestion.chapter,
+    question: pendingQuestion.question,
+    choices: pendingQuestion.choices,
+    correctChoice: pendingQuestion.correctChoice,
+    explanation: pendingQuestion.explanation,
+    generatedAt: timestampToIso(pendingQuestion.generatedAt),
+    generationRunId: pendingQuestion.generationRunId ?? null,
+    trigger: pendingQuestion.trigger ?? null,
+    requestedBy: pendingQuestion.requestedBy ?? null,
+  };
+}
+
+/**
+ * Shapes a generationRuns document for the admin page.
+ *
+ * @param {Object} doc - The Firestore document snapshot.
+ * @return {Object} The generation run.
+ */
+function normalizeGenerationRunDoc(doc) {
+  const generationRun = doc.data();
+  return {
+    id: doc.id,
+    trigger: generationRun.trigger ?? null,
+    chapter: generationRun.chapter ?? null,
+    requestedQuestionCount: generationRun.requestedQuestionCount ?? null,
+    generatedQuestionCount: generationRun.generatedQuestionCount ?? null,
+    status: generationRun.status ?? null,
+    errors: Array.isArray(generationRun.errors) ? generationRun.errors : [],
+    dryRun: generationRun.dryRun === true,
+    requestedBy: generationRun.requestedBy ?? null,
+    startedAt: timestampToIso(generationRun.startedAt),
+    finishedAt: timestampToIso(generationRun.finishedAt),
+    model: generationRun.model ?? null,
+  };
+}
+
+/**
+ * Counts a chapter's live human and AI questions, in total and free, for the approve screen.
+ *
+ * @param {number} chapter - The chapter number.
+ * @return {Promise<object>} {humanTotal, humanFree, aiTotal, aiFree}.
+ */
+async function countChapterSplit(chapter) {
+  const countMatchingDocs = async (query) => (await query.count().get()).data().count;
+  const humanChapterQuery = db.collection("questions").where("chapter", "==", chapter);
+  const aiChapterQuery = db.collection("questionsAi").where("chapter", "==", chapter);
+  const [humanTotal, humanFree, aiTotal, aiFree] = await Promise.all([
+    countMatchingDocs(humanChapterQuery),
+    countMatchingDocs(humanChapterQuery.where("premium", "==", false)),
+    countMatchingDocs(aiChapterQuery),
+    countMatchingDocs(aiChapterQuery.where("premium", "==", false)),
+  ]);
+  return {humanTotal, humanFree, aiTotal, aiFree};
+}
+
 export const logStudyActivity = onCall(
     {
       region: "us-west1",
@@ -382,6 +875,8 @@ export const logStudyActivity = onCall(
           clientTs: typeof raw.clientTs === "number" ? raw.clientTs : null,
           isPremiumContent: raw.isPremiumContent === true,
           isProUser: raw.isProUser === true,
+          aiGenerated: raw.aiGenerated === true,
+          aiQuestionId: typeof raw.aiQuestionId === "string" ? raw.aiQuestionId.slice(0, 64) : null,
         };
 
         sanitizedEvents.push(event);
@@ -484,34 +979,25 @@ export const getQuestionsByChapter = onCall(
       }
 
       const chapter = parseInt(request.data?.chapter) || 1;
-      console.log(`Workspaceing questions for chapter: ${chapter} (Premium: ${isPremium})`);
-
-      let questionsQuery = db.collection("questions")
-          .where("chapter", "==", chapter);
-
-      if (!isPremium) {
-        console.log("Querying non-premium questions only.");
-        questionsQuery = questionsQuery.where("premium", "==", false).orderBy("questionNumber");
-      } else {
-        console.log("Querying all questions for premium user.");
-        questionsQuery = questionsQuery.orderBy("questionNumber");
-      }
-
-      const snapshot = await questionsQuery.get();
-
-      if (snapshot.empty) {
-        console.log(`No questions found for chapter ${chapter} matching criteria.`);
-        return {questions: []};
-      }
-
-      console.log(`Found ${snapshot.docs.length} questions.`);
-      const questions = snapshot.docs.map((doc) => {
-        const questionData = doc.data();
-        questionData.id = doc.id;
-        return questionData;
+      const requestedQuestionSource = readRequestedQuestionSource(request.data?.questionSource);
+      const aiSettings = await readAiSettings();
+      const questionSource = resolveQuestionSource({
+        aiQuestionsServed: aiSettings.servingEnabled,
+        isPro: isPremium,
+        requestedQuestionSource,
       });
+      console.log(`Fetching questions for chapter: ${chapter} (Premium: ${isPremium}, source: ${questionSource})`);
+      console.log(isPremium ? "Querying all questions for premium user." : "Querying non-premium questions only.");
 
-      return {questions: questions};
+      const questions = await fetchQuestionsForChapter({chapter, isPremium, questionSource});
+
+      if (questions.length === 0) {
+        console.log(`No questions found for chapter ${chapter} matching criteria.`);
+      } else {
+        console.log(`Found ${questions.length} questions.`);
+      }
+
+      return {questions, questionSource};
     },
 );
 
@@ -647,31 +1133,27 @@ export const preloadContent = onCall(
         isPremium = false;
       }
 
+      const requestedQuestionSource = readRequestedQuestionSource(request.data?.questionSource);
+      const aiSettings = await readAiSettings();
+      const questionSource = resolveQuestionSource({
+        aiQuestionsServed: aiSettings.servingEnabled,
+        isPro: isPremium,
+        requestedQuestionSource,
+      });
+
       const chaptersToPreload = [1, 2, 3];
-      console.log(`Preloading content for chapters: ${chaptersToPreload.join(", ")} (Premium: ${isPremium})`);
+      console.log(`Preloading content for chapters: ${chaptersToPreload.join(", ")} ` +
+        `(Premium: ${isPremium}, source: ${questionSource})`);
 
       const result = {
         questions: {},
         flashcards: {},
+        questionSource,
       };
 
       for (const chapter of chaptersToPreload) {
         try {
-          let questionsQuery = db.collection("questions")
-              .where("chapter", "==", chapter);
-
-          if (!isPremium) {
-            questionsQuery = questionsQuery.where("premium", "==", false).orderBy("questionNumber");
-          } else {
-            questionsQuery = questionsQuery.orderBy("questionNumber");
-          }
-
-          const questionsSnapshot = await questionsQuery.get();
-          result.questions[chapter] = questionsSnapshot.docs.map((doc) => {
-            const questionData = doc.data();
-            questionData.id = doc.id;
-            return questionData;
-          });
+          result.questions[chapter] = await fetchQuestionsForChapter({chapter, isPremium, questionSource});
 
           let flashcardsQuery = db.collection("flashcards")
               .where("chapter", "==", chapter);
@@ -703,6 +1185,24 @@ export const preloadContent = onCall(
       console.log(`Preload complete: ${totalQuestions} total questions, ${totalFlashcards} total flashcards`);
 
       return result;
+    },
+);
+
+export const getContentStatus = onCall(
+    {
+      region: "us-west1",
+      enforceAppCheck: true,
+    },
+    async () => {
+      // Two document reads behind App Check, so no rate limiter.
+      const [contentDoc, aiSettingsDoc] = await db.getAll(
+          db.collection("metadata").doc("content"),
+          db.collection("metadata").doc("aiQuestions"),
+      );
+      return {
+        contentVersion: Number(contentDoc.get("contentVersion")) || 0,
+        aiQuestionsServed: normalizeAiSettings(aiSettingsDoc.data()).servingEnabled,
+      };
     },
 );
 
@@ -800,84 +1300,68 @@ export const importQuestionsFromRepo = onSchedule(
       schedule: "0 0 * * *",
       timeZone: "America/Los_Angeles",
       region: "us-west1",
-      secrets: [githubToken, githubUsername, githubRepo],
+      timeoutSeconds: 300,
+      secrets: [githubToken, githubUsername, githubRepo, aiQuestionsGithubToken, aiQuestionsGithubRepo],
     },
     async () => {
-      try {
-        const token = githubToken.value();
-        const username = githubUsername.value();
-        const repo = githubRepo.value();
+      const repoOwner = githubUsername.value();
+      const repoImports = [];
 
-        if (!token || !username || !repo) {
-          console.error("Missing GitHub credentials");
-          return;
+      if (repoOwner && githubRepo.value() && githubToken.value()) {
+        repoImports.push({
+          repoName: githubRepo.value(),
+          repoToken: githubToken.value(),
+          collectionName: "questions",
+          fileExtension: "js",
+          isAiRepo: false,
+        });
+      } else {
+        console.error("Missing GitHub credentials for the human questions repo; skipping the human questions import");
+      }
+
+      if (repoOwner && aiQuestionsGithubRepo.value() && aiQuestionsGithubToken.value()) {
+        repoImports.push({
+          repoName: aiQuestionsGithubRepo.value(),
+          repoToken: aiQuestionsGithubToken.value(),
+          collectionName: "questionsAi",
+          fileExtension: "json",
+          isAiRepo: true,
+        });
+      } else {
+        console.error("Missing GitHub credentials for the AI questions repo; skipping the AI questions import");
+      }
+
+      for (const {repoName, repoToken, collectionName, fileExtension, isAiRepo} of repoImports) {
+        const chaptersByStatus = {};
+        for (const chapter of QUESTION_CHAPTERS) {
+          let status;
+          try {
+            const importResult = await importChapterFromRepo({
+              repoOwner,
+              repoName,
+              repoToken,
+              filePath: `${chapter}.${fileExtension}`,
+              collectionName,
+              chapter,
+              isAiRepo,
+            });
+            status = importResult.status;
+          } catch (error) {
+            status = "failed";
+            console.error(`Error importing ${collectionName} chapter ${chapter}:`, error);
+            await logFunctionError(error, {
+              functionName: "importQuestionsFromRepo",
+              requestData: {chapter, collectionName},
+              severity: "error",
+              bucket: "generic",
+            });
+          }
+          chaptersByStatus[status] = [...(chaptersByStatus[status] || []), chapter];
         }
 
-        const chapters = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
-        const metadataRef = db.collection("metadata").doc("questions");
-
-        // Get existing metadata document for hashes
-        const metadataDoc = await metadataRef.get();
-        const metadata = metadataDoc.exists ? metadataDoc.data() : {};
-
-        for (const chapter of chapters) {
-          const repoUrl = `https://api.github.com/repos/${username}/${repo}/contents/${chapter}.js`;
-
-          const response = await fetch(repoUrl, {
-            headers: {Authorization: `token ${token}`},
-          });
-          const data = await response.json();
-          if (!data.content) {
-            console.error(`No content found in the file for chapter ${chapter} from GitHub`);
-            continue;
-          }
-
-          // Decode the file content (GitHub returns the content in base64)
-          const jsonStr = Buffer.from(data.content, "base64").toString("utf8");
-
-          // Compute a SHA-256 hash of the JSON string
-          const newHash = crypto.createHash("sha256").update(jsonStr).digest("hex");
-          const storedHash = metadata[`hash_${chapter}`] || null;
-          if (storedHash === newHash) {
-            console.log(`No changes detected for chapter ${chapter}; skipping update.`);
-            continue;
-          }
-
-          // Parse the questions (json)
-          const questions = JSON.parse(jsonStr);
-          console.log(`Fetched questions for chapter ${chapter} from repo:`, questions);
-
-          // Delete all existing questions for this chapter
-          const chapterQuerySnapshot = await db
-              .collection("questions")
-              .where("chapter", "==", chapter)
-              .get();
-          const deleteBatch = db.batch();
-          chapterQuerySnapshot.docs.forEach((doc) => {
-            deleteBatch.delete(doc.ref);
-          });
-          await deleteBatch.commit();
-          console.log(`Cleared the questions for chapter ${chapter}`);
-
-          // Add new questions in a batch write (ensure each question has the correct chapter field)
-          const addBatch = db.batch();
-          questions.forEach((question) => {
-            question.chapter = chapter;
-            const docRef = db.collection("questions").doc();
-            addBatch.set(docRef, question);
-          });
-          await addBatch.commit();
-          console.log(`Questions for chapter ${chapter} imported to Firestore successfully`);
-
-          // Update the stored hash for this chapter in metadata
-          metadata[`hash_${chapter}`] = newHash;
+        for (const [status, chapters] of Object.entries(chaptersByStatus)) {
+          console.log(`Import ${collectionName} ${status}: chapters ${chapters.join(", ")}`);
         }
-
-        // Save updated metadata (all chapter hashes)
-        await metadataRef.set(metadata);
-        console.log("Updated metadata hashes for chapters:", chapters);
-      } catch (error) {
-        console.error("Error importing questions:", error);
       }
     },
 );
@@ -1935,5 +2419,290 @@ export const getUsersPage = onCall(
           total,
         },
       };
+    },
+);
+
+export const getAiPendingQuestions = onCall(
+    {
+      region: "us-west1",
+      enforceAppCheck: true,
+    },
+    async (request) => {
+      const adminUid = requireAdmin(request);
+
+      try {
+        const [pendingQuestionsSnapshot, generationRunsSnapshot, settings] = await Promise.all([
+          aiDb.collection("questionsAiPending").where("status", "==", "pending").get(),
+          aiDb.collection("generationRuns").orderBy("startedAt", "desc").limit(AI_GENERATION_RUNS_PAGE_SIZE).get(),
+          readAiSettings(),
+        ]);
+
+        // Newest first. Sorted here rather than in the query, so no composite index is needed.
+        const pendingQuestions = pendingQuestionsSnapshot.docs
+            .map(normalizePendingQuestionDoc)
+            .sort((first, second) => (Date.parse(second.generatedAt) || 0) - (Date.parse(first.generatedAt) || 0));
+        const generationRuns = generationRunsSnapshot.docs.map(normalizeGenerationRunDoc);
+
+        const pendingChapters = [...new Set(pendingQuestions.map((pendingQuestion) => pendingQuestion.chapter))]
+            .filter((chapter) => Number.isInteger(chapter));
+        const pendingChapterSplits = await Promise.all(pendingChapters.map((chapter) => countChapterSplit(chapter)));
+        const chapterSplits = Object.fromEntries(
+            pendingChapters.map((chapter, chapterIndex) => [chapter, pendingChapterSplits[chapterIndex]]),
+        );
+
+        return {pendingQuestions, generationRuns, settings, chapterSplits};
+      } catch (error) {
+        console.error("Error loading AI questions:", error);
+        await logFunctionError(error, {
+          functionName: "getAiPendingQuestions",
+          uid: adminUid,
+          ip: request.rawRequest?.ip || null,
+          severity: "error",
+          bucket: "generic",
+        });
+        throw new HttpsError("internal", "Failed to load AI questions");
+      }
+    },
+);
+
+export const approveAiQuestion = onCall(
+    {
+      region: "us-west1",
+      enforceAppCheck: true,
+      secrets: [aiQuestionsGithubToken, aiQuestionsGithubRepo, githubUsername],
+    },
+    async (request) => {
+      const adminUid = requireAdmin(request);
+      const pendingQuestionId = readPendingQuestionId(request.data?.pendingQuestionId);
+      const editedQuestion = request.data?.editedQuestion ?? {};
+      if (typeof editedQuestion !== "object" || Array.isArray(editedQuestion)) {
+        throw new HttpsError("invalid-argument", "editedQuestion must be an object");
+      }
+      const premium = typeof request.data?.premium === "boolean" ? request.data.premium : true;
+
+      try {
+        const repoOwner = githubUsername.value();
+        const repoName = aiQuestionsGithubRepo.value();
+        const repoToken = aiQuestionsGithubToken.value();
+        if (!repoOwner || !repoName || !repoToken) {
+          throw new HttpsError("failed-precondition", "The AI questions repo is not configured");
+        }
+
+        const pendingQuestionRef = aiDb.collection("questionsAiPending").doc(pendingQuestionId);
+        const pendingQuestionDoc = await pendingQuestionRef.get();
+        if (!pendingQuestionDoc.exists) {
+          throw new HttpsError("not-found", "Pending question not found");
+        }
+        const pendingQuestion = pendingQuestionDoc.data();
+        if (pendingQuestion.status === "approved") {
+          return {
+            success: true,
+            chapter: pendingQuestion.chapter,
+            questionNumber: pendingQuestion.questionNumber,
+            alreadyInRepo: true,
+          };
+        }
+        if (pendingQuestion.status === "rejected") {
+          throw new HttpsError("failed-precondition", "This question was rejected, so it can't be approved");
+        }
+
+        // The chapter always comes from the pending doc, never from the client.
+        const chapter = pendingQuestion.chapter;
+        if (!QUESTION_CHAPTERS.includes(chapter)) {
+          throw new HttpsError("failed-precondition", `The pending question has an invalid chapter: ${chapter}`);
+        }
+
+        const candidateQuestion = {};
+        for (const fieldName of ["question", "choices", "correctChoice", "explanation"]) {
+          candidateQuestion[fieldName] = editedQuestion[fieldName] !== undefined ?
+            editedQuestion[fieldName] :
+            pendingQuestion[fieldName];
+        }
+        const validation = validateAiQuestion(candidateQuestion);
+        if (!validation.valid) {
+          throw new HttpsError("invalid-argument", validation.errors.join("; "));
+        }
+        const approvedQuestion = validation.question;
+
+        const lockId = `questionsAi_chapter_${chapter}`;
+        const lockToken = await acquireLock(lockId, `approve:${pendingQuestionId}`, CHAPTER_LOCK_TTL_MS);
+        if (!lockToken) {
+          throw new HttpsError("aborted", `Chapter ${chapter} is being updated right now. Try again in a minute.`);
+        }
+
+        let repoCommit;
+        try {
+          repoCommit = await commitAiQuestionToRepo({
+            repoOwner,
+            repoName,
+            repoToken,
+            approvedQuestion: {chapter, ...approvedQuestion, premium, aiQuestionId: pendingQuestionId},
+          });
+          // Written from the committed file while still holding the lock, so a nightly import can't
+          // write an older copy over it, and students see the question without waiting for that import.
+          await replaceChapterDocuments({
+            collectionName: "questionsAi",
+            chapter,
+            questionDocs: repoCommit.questionDocs,
+            fileHash: computeContentHash(repoCommit.committedContent),
+          });
+        } finally {
+          await releaseLock(lockId, lockToken);
+        }
+
+        // When an earlier attempt already committed the question, record the entry in the repo, not this retry's edits.
+        const {entryAlreadyInRepo} = repoCommit;
+        const committedQuestion = repoCommit.alreadyInRepo ? {
+          question: entryAlreadyInRepo.question,
+          choices: entryAlreadyInRepo.choices,
+          correctChoice: entryAlreadyInRepo.correctChoice,
+          explanation: entryAlreadyInRepo.explanation,
+          premium: entryAlreadyInRepo.premium !== false, // the same default the import applies
+        } : {...approvedQuestion, premium};
+
+        // Last, as its own write (a batch can't span two databases). If it fails, the question is
+        // already live and approving again finishes the job.
+        await pendingQuestionRef.update({
+          status: "approved",
+          approvedAt: admin.firestore.FieldValue.serverTimestamp(),
+          approvedBy: adminUid,
+          questionNumber: repoCommit.questionNumber,
+          ...committedQuestion,
+        });
+
+        console.log(`AI question ${pendingQuestionId} approved by ${adminUid} as question ${repoCommit.questionNumber} ` +
+          `of chapter ${chapter} (premium: ${committedQuestion.premium}, already in repo: ${repoCommit.alreadyInRepo})`);
+        return {
+          success: true,
+          chapter,
+          questionNumber: repoCommit.questionNumber,
+          alreadyInRepo: repoCommit.alreadyInRepo,
+        };
+      } catch (error) {
+        if (error instanceof HttpsError) throw error;
+        console.error("Error approving AI question:", error);
+        await logFunctionError(error, {
+          functionName: "approveAiQuestion",
+          uid: adminUid,
+          ip: request.rawRequest?.ip || null,
+          requestData: {pendingQuestionId},
+          severity: "error",
+          bucket: "generic",
+        });
+        throw new HttpsError("internal", "Failed to approve the AI question");
+      }
+    },
+);
+
+export const rejectAiQuestion = onCall(
+    {
+      region: "us-west1",
+      enforceAppCheck: true,
+    },
+    async (request) => {
+      const adminUid = requireAdmin(request);
+      const pendingQuestionId = readPendingQuestionId(request.data?.pendingQuestionId);
+      const rejectionReason = typeof request.data?.rejectionReason === "string" ?
+        request.data.rejectionReason.trim().slice(0, REJECTION_REASON_MAX_LENGTH) || null :
+        null;
+
+      try {
+        const pendingQuestionRef = aiDb.collection("questionsAiPending").doc(pendingQuestionId);
+        await aiDb.runTransaction(async (transaction) => {
+          const pendingQuestionDoc = await transaction.get(pendingQuestionRef);
+          if (!pendingQuestionDoc.exists) {
+            throw new HttpsError("not-found", "Pending question not found");
+          }
+          if (pendingQuestionDoc.get("status") !== "pending") {
+            throw new HttpsError("failed-precondition", "Only pending questions can be rejected");
+          }
+          // Rejected questions stay in the queue so the generator avoids their topics.
+          transaction.update(pendingQuestionRef, {
+            status: "rejected",
+            rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
+            rejectedBy: adminUid,
+            rejectionReason,
+          });
+        });
+
+        console.log(`AI question ${pendingQuestionId} rejected by ${adminUid}`);
+        return {success: true};
+      } catch (error) {
+        if (error instanceof HttpsError) throw error;
+        console.error("Error rejecting AI question:", error);
+        await logFunctionError(error, {
+          functionName: "rejectAiQuestion",
+          uid: adminUid,
+          ip: request.rawRequest?.ip || null,
+          requestData: {pendingQuestionId},
+          severity: "error",
+          bucket: "generic",
+        });
+        throw new HttpsError("internal", "Failed to reject the AI question");
+      }
+    },
+);
+
+export const updateAiSettings = onCall(
+    {
+      region: "us-west1",
+      enforceAppCheck: true,
+    },
+    async (request) => {
+      const adminUid = requireAdmin(request);
+      const requestData = request.data || {};
+
+      const settingsUpdates = {};
+      for (const switchName of ["generationEnabled", "servingEnabled"]) {
+        if (requestData[switchName] !== undefined) {
+          if (typeof requestData[switchName] !== "boolean") {
+            throw new HttpsError("invalid-argument", `${switchName} must be a boolean`);
+          }
+          settingsUpdates[switchName] = requestData[switchName];
+        }
+      }
+      if (requestData.questionsPerRun !== undefined) {
+        const questionsPerRun = requestData.questionsPerRun;
+        if (!Number.isInteger(questionsPerRun) ||
+            questionsPerRun < MIN_AI_QUESTIONS_PER_RUN || questionsPerRun > MAX_AI_QUESTIONS_PER_RUN) {
+          throw new HttpsError("invalid-argument",
+              `questionsPerRun must be an integer from ${MIN_AI_QUESTIONS_PER_RUN} to ${MAX_AI_QUESTIONS_PER_RUN}`);
+        }
+        settingsUpdates.questionsPerRun = questionsPerRun;
+      }
+      if (Object.keys(settingsUpdates).length === 0) {
+        throw new HttpsError("invalid-argument",
+            "Send at least one of generationEnabled, servingEnabled or questionsPerRun");
+      }
+
+      try {
+        const aiSettingsRef = db.collection("metadata").doc("aiQuestions");
+        const nextSettings = await db.runTransaction(async (transaction) => {
+          const aiSettingsDoc = await transaction.get(aiSettingsRef);
+          const currentSettings = normalizeAiSettings(aiSettingsDoc.data());
+          const updatedSettings = normalizeAiSettings({...currentSettings, ...settingsUpdates});
+          transaction.set(aiSettingsRef, updatedSettings, {merge: true});
+          // Clients drop their cached questions when contentVersion changes, so a serving change
+          // reaches every user on their next page load instead of after the 24 hour cache.
+          if (updatedSettings.servingEnabled !== currentSettings.servingEnabled) {
+            transaction.set(db.collection("metadata").doc("content"), buildContentVersionBump(), {merge: true});
+          }
+          return updatedSettings;
+        });
+
+        console.log(`AI settings updated by ${adminUid}:`, nextSettings);
+        return {settings: nextSettings};
+      } catch (error) {
+        console.error("Error updating AI settings:", error);
+        await logFunctionError(error, {
+          functionName: "updateAiSettings",
+          uid: adminUid,
+          ip: request.rawRequest?.ip || null,
+          requestData: settingsUpdates,
+          severity: "error",
+          bucket: "generic",
+        });
+        throw new HttpsError("internal", "Failed to update AI settings");
+      }
     },
 );
