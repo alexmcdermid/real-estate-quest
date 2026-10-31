@@ -178,15 +178,16 @@ export function appendAiQuestionToChapterFile(existingQuestions, newQuestion) {
       .filter((questionNumber) => Number.isFinite(questionNumber));
   const questionNumber = Math.max(0, ...existingQuestionNumbers) + 1;
 
-  // Key order is part of the repo file format.
+  // Same fields and key order as the human question files, plus the AI flag and id.
   const appendedEntry = {
     chapter: newQuestion.chapter,
     questionNumber,
     question: newQuestion.question,
     choices: newQuestion.choices,
     correctChoice: newQuestion.correctChoice,
-    explanation: newQuestion.explanation,
     premium: newQuestion.premium,
+    explanation: newQuestion.explanation,
+    aiGenerated: true,
     aiQuestionId: newQuestion.aiQuestionId,
   };
 
@@ -255,8 +256,8 @@ export function normalizeAiChapterDocs(parsedFileArray, chapter) {
       question: entry.question,
       choices: entry.choices,
       correctChoice: entry.correctChoice,
-      explanation: entry.explanation,
       premium: entry.premium !== false,
+      explanation: entry.explanation,
       aiGenerated: true,
       aiQuestionId,
     };

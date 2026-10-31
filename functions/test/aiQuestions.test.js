@@ -227,7 +227,7 @@ describe("appendAiQuestionToChapterFile", () => {
     const result = appendAiQuestionToChapterFile([], newApprovedQuestion);
     assert.equal(result.alreadyInRepo, false);
     assert.equal(result.questionNumber, 1);
-    assert.deepEqual(parseChapterFile(result.fileContent), [{...newApprovedQuestion, questionNumber: 1}]);
+    assert.deepEqual(parseChapterFile(result.fileContent), [{...newApprovedQuestion, questionNumber: 1, aiGenerated: true}]);
   });
 
   it("numbers the next question after the highest existing number", () => {
@@ -257,7 +257,7 @@ describe("appendAiQuestionToChapterFile", () => {
     });
   });
 
-  it("appends the entry with the repo key order, keeps existing entries and does not mutate them", () => {
+  it("appends the entry in the human question files' key order plus aiGenerated, without touching existing entries", () => {
     const existingEntry = {chapter: 3, questionNumber: 1, question: "Old?", aiQuestionId: "old"};
     const existingQuestions = [existingEntry];
     const {fileContent} = appendAiQuestionToChapterFile(existingQuestions, {
@@ -272,8 +272,10 @@ describe("appendAiQuestionToChapterFile", () => {
     const parsedFile = parseChapterFile(fileContent);
     assert.deepEqual(parsedFile[0], existingEntry);
     assert.deepEqual(Object.keys(parsedFile[1]), [
-      "chapter", "questionNumber", "question", "choices", "correctChoice", "explanation", "premium", "aiQuestionId",
+      "chapter", "questionNumber", "question", "choices", "correctChoice", "premium", "explanation", "aiGenerated",
+      "aiQuestionId",
     ]);
+    assert.equal(parsedFile[1].aiGenerated, true);
     assert.equal(existingQuestions.length, 1);
   });
 
