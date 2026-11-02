@@ -105,6 +105,9 @@ function recordQuestionAnswer({ question, chapter, isCorrect, selectedChoice, is
     selectedChoice: Number.isFinite(selectedChoice) ? selectedChoice : null,
     isPremiumContent: question.premium === true,
     isProUser: isProUser === true,
+    // AI and human questions have separate numbering, so these keep them apart in the logs
+    aiGenerated: question.aiGenerated === true,
+    aiQuestionId: typeof question.aiQuestionId === "string" ? question.aiQuestionId : null,
   });
 }
 
@@ -117,6 +120,9 @@ function recordFlashcardView({ flashcard, chapter, isProUser }) {
     itemNumber: flashcard.cardNumber ?? null,
     isPremiumContent: flashcard.premium === true,
     isProUser: isProUser === true,
+    // AI and human flashcards have separate numbering, so these keep them apart in the logs
+    aiGenerated: flashcard.aiGenerated === true,
+    aiFlashcardId: typeof flashcard.aiFlashcardId === "string" ? flashcard.aiFlashcardId : null,
   });
 }
 

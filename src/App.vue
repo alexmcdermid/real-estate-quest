@@ -20,8 +20,11 @@ import RateLimitBanner from './components/RateLimitBanner.vue';
 import GlobalSnackbar from './components/GlobalSnackbar.vue';
 import { rateLimitBanner } from './composables/useRateLimitBanner';
 import { initPreload } from './composables/usePreload';
+import { ensureContentStatusChecked } from './composables/useContentStatus';
 
-onMounted(() => {
+onMounted(async () => {
+  // The version check may clear the cache, so it runs before the preload writes to it
+  await ensureContentStatusChecked();
   initPreload();
 });
 </script>

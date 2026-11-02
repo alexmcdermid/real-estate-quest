@@ -9,6 +9,19 @@
           color="primary"
           hide-details
         ></v-switch>
+        <v-radio-group
+          v-if="isPro && contentStatus.aiContentServed"
+          v-model="options.contentSource"
+          label="Question and flashcard source"
+          color="primary"
+          class="mt-4"
+          hint="AI questions and flashcards are written by AI and reviewed before they are published."
+          persistent-hint
+        >
+          <v-radio label="Mixed (human + AI)" value="mixed"></v-radio>
+          <v-radio label="Human only" value="human"></v-radio>
+          <v-radio label="AI only" value="ai"></v-radio>
+        </v-radio-group>
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
@@ -20,10 +33,14 @@
 
 <script setup>
 import { ref } from "vue";
+import { storeToRefs } from "pinia";
 import useOptions from "../composables/useOption";
+import { useAuthStore } from "../composables/useAuth";
+import { contentStatus } from "../composables/useContentStatus";
 
 const dialog = ref(false);
 const { options } = useOptions();
+const { isPro } = storeToRefs(useAuthStore());
 
 function Close() {
   dialog.value = false;
