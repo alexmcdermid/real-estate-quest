@@ -840,9 +840,15 @@ onMounted(async () => {
 
 <style scoped>
 .admin-container {
-  max-width: 1400px;
+  max-width: 87.5rem;
   margin: 0 auto;
-  padding: 20px;
+  padding: 1.25rem;
+}
+
+/* Let a table title and its search box stack on narrow screens instead of overflowing the card */
+.v-card-title > div {
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .v-card {

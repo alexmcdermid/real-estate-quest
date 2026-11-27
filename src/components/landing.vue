@@ -14,7 +14,7 @@
     </v-row>
 
     <!-- Features Section -->
-    <v-row class="features-section mt-12" align="center" justify="space-around">
+    <v-row class="features-section landing-section" align="start" justify="space-around">
       <v-col cols="12" md="4" class="text-center">
         <v-icon color="primary" size="3rem">mdi-school</v-icon>
         <h3>Practice That Matters</h3>
@@ -39,7 +39,7 @@
     </v-row>
 
     <!-- Why Choose Us Section -->
-    <v-row class="why-choose-us-section mt-12" align="center" justify="center">
+    <v-row class="why-choose-us-section landing-section" align="center" justify="center">
       <v-col cols="12" md="8" class="text-center">
         <h2>Why Choose BC Real Estate Quest?</h2>
         <p>
@@ -48,7 +48,7 @@
       </v-col>
     </v-row>
 
-    <v-row class="why-choose-us-section mt-12" align="center" justify="center">
+    <v-row class="why-choose-us-section landing-section" align="stretch" justify="center">
       <v-col cols="12" md="4" class="text-center">
         <v-card outlined class="why-card">
           <v-card-title>Expert Exam Content</v-card-title>
@@ -76,7 +76,7 @@
     </v-row>
 
     <!-- Call-to-Action Section -->
-    <v-row class="cta-section mt-12" align="center" justify="center">
+    <v-row class="cta-section landing-section" align="center" justify="center">
       <v-col cols="12" md="9" class="text-center">
         <h2>Start Your BC Real Estate Exam Prep Today</h2>
         <p>
@@ -109,6 +109,18 @@ function navigateToPro() {
 <style scoped>
 .landing-page {
   padding: 2rem;
+}
+
+.landing-section {
+  margin-top: 3rem;
+}
+
+/* Even out line lengths so wrapped headings don't leave a word or two on their own line */
+.landing-page h1,
+.landing-page h2,
+.landing-page h3,
+.landing-page p {
+  text-wrap: balance;
 }
 
 .hero-section {
@@ -151,6 +163,7 @@ function navigateToPro() {
 }
 
 .why-card {
+  height: 100%;
   padding: 1rem;
   transition: box-shadow 0.3s ease, transform 0.3s ease;
 }
@@ -165,6 +178,7 @@ function navigateToPro() {
   overflow: visible !important;
   text-overflow: unset !important;
   word-break: break-word;
+  line-height: 1.4;
 }
 
 .cta-section h2 {
@@ -195,6 +209,15 @@ function navigateToPro() {
   .why-choose-us-section h2,
   .cta-section h2 {
     font-size: 1.5rem;
+  }
+
+  .why-card {
+    padding: 0.5rem;
+  }
+
+  .cta-section .cta-btn {
+    width: 100%;
+    margin: 0.5rem 0;
   }
 }
 </style>
