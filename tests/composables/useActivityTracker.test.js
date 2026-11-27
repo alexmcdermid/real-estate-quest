@@ -121,4 +121,53 @@ describe("useActivityTracker lifecycle flushing", () => {
     const payload = mockLogStudyActivity.mock.calls[0][0];
     expect(payload.events[0].selectedChoice).toBeNull();
   });
+
+  it("sends aiGenerated and aiQuestionId so AI and human questions stay apart", async () => {
+    const {useActivityTracker} = await import("../../src/composables/useActivityTracker");
+    const tracker = useActivityTracker();
+
+    tracker.recordQuestionAnswer({
+      question: {chapter: 3, questionNumber: 1, premium: false, aiGenerated: true, aiQuestionId: "pending123"},
+      isCorrect: true,
+      selectedChoice: 2,
+      isProUser: false,
+    });
+    tracker.recordQuestionAnswer({
+      question: {chapter: 3, questionNumber: 1, premium: false},
+      isCorrect: false,
+      selectedChoice: 0,
+      isProUser: false,
+    });
+
+    await tracker.flushPendingEvents(true);
+
+    const payload = mockLogStudyActivity.mock.calls[0][0];
+    expect(payload.events[0]).toMatchObject({itemNumber: 1, aiGenerated: true, aiQuestionId: "pending123"});
+    expect(payload.events[1]).toMatchObject({itemNumber: 1, aiGenerated: false, aiQuestionId: null});
+  });
+
+  it("sends aiGenerated and aiFlashcardId so AI and human flashcards stay apart", async () => {
+    const {useActivityTracker} = await import("../../src/composables/useActivityTracker");
+    const tracker = useActivityTracker();
+
+    tracker.recordFlashcardView({
+      flashcard: {chapter: 4, cardNumber: 2, premium: false, aiGenerated: true, aiFlashcardId: "pendingCard7"},
+      isProUser: true,
+    });
+    tracker.recordFlashcardView({
+      flashcard: {chapter: 4, cardNumber: 2, premium: true},
+      isProUser: true,
+    });
+
+    await tracker.flushPendingEvents(true);
+
+    const payload = mockLogStudyActivity.mock.calls[0][0];
+    expect(payload.events[0]).toMatchObject({
+      type: "flashcard",
+      itemNumber: 2,
+      aiGenerated: true,
+      aiFlashcardId: "pendingCard7",
+    });
+    expect(payload.events[1]).toMatchObject({type: "flashcard", itemNumber: 2, aiGenerated: false, aiFlashcardId: null});
+  });
 });

@@ -9,4 +9,6 @@
  * @property {Array<string>} tags - Optional tags for categorizing cards (e.g., "definitions", "concepts").
  * @property {boolean} premium - Whether this is a premium-only flashcard.
  * @property {number} difficulty - Optional difficulty rating (1-3).
+ * @property {boolean} [aiGenerated] - true for AI-generated flashcards (flashcardsAi); absent on human flashcards.
+ * @property {string} [aiFlashcardId] - AI flashcards only: stable id from review through the AI repo (flashcards/<chapter>.json).
  */

@@ -33,6 +33,8 @@ export default defineConfig({
   },
   */
   test: {
+    // functions/test holds the backend's node:test suite, run with npm test in functions/
+    include: ['tests/**/*.test.js'],
     environment: 'jsdom',
     setupFiles: ['tests/setup.js'],
     environmentOptions: {

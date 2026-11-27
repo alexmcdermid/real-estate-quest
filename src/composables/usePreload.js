@@ -1,9 +1,10 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp } from "../config/firebaseConfig";
 import { CACHE_KEY, STALE_TIME } from '../config/constants';
-import { encodeCache, decodeCache } from './useQuestion';
+import { encodeCache, decodeCache, questionsCacheKey } from './useQuestion';
+import { flashcardsCacheKey } from './useFlashcard';
+import { getOptions } from './useOption';
 import { showRateLimitBanner } from './useRateLimitBanner';
-import { showNotification } from './useNotifier';
 
 /**
  * Checks if any content in the cache is stale or missing
@@ -57,8 +58,9 @@ export async function preloadContent() {
     const functions = getFunctions(firebaseApp, "us-west1");
     const preloadContentCallable = httpsCallable(functions, "preloadContent");
     
-    const result = await preloadContentCallable();
-    
+    // The server applies its own rule to the saved choice and returns the source it used
+    const result = await preloadContentCallable({ contentSource: getOptions().contentSource || "mixed" });
+
     let cache = {};
     const cachedEncoded = localStorage.getItem(CACHE_KEY);
     if (cachedEncoded) {
@@ -66,18 +68,19 @@ export async function preloadContent() {
     }
 
     const timestamp = Date.now();
+    const appliedContentSource = result.data.contentSource || "mixed";
 
-    // Update cache with questions for each chapter
+    // Update cache with questions for each chapter, under the source the server applied
     for (const [chapter, questions] of Object.entries(result.data.questions)) {
-      cache[chapter] = {
+      cache[questionsCacheKey(appliedContentSource, chapter)] = {
         timestamp,
         questions,
       };
     }
 
-    // Update cache with flashcards for each chapter
+    // Update cache with flashcards for each chapter, under the same applied source
     for (const [chapter, flashcards] of Object.entries(result.data.flashcards)) {
-      cache[`flashcards_${chapter}`] = {
+      cache[flashcardsCacheKey(appliedContentSource, chapter)] = {
         timestamp,
         flashcards,
       };

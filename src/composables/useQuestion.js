@@ -33,11 +33,23 @@ export function clearCache() {
     cache = decodeCache(cachedEncoded);
   }
 
+  // Keep the saved options and the content version the cache was checked against (see useContentStatus.js)
   const preservedOptions = cache.options || {};
-  localStorage.setItem(CACHE_KEY, encodeCache({ options: preservedOptions }));
+  localStorage.setItem(CACHE_KEY, encodeCache({ options: preservedOptions, contentVersion: cache.contentVersion }));
 }
 
-export async function fetchQuestionsByChapter(chapter = 1) {
+/**
+ * Cache key for one chapter's questions from one content source.
+ *
+ * @param {string} contentSource - "mixed", "human" or "ai".
+ * @param {number|string} chapter - The chapter number.
+ * @returns {string} - e.g. "questions_mixed_3".
+ */
+export function questionsCacheKey(contentSource, chapter) {
+  return `questions_${contentSource}_${chapter}`;
+}
+
+export async function fetchQuestionsByChapter(chapter = 1, contentSource = "mixed") {
   // Retrieve the entire cache from localStorage and decode it
   let cache = {};
   const cachedEncoded = localStorage.getItem(CACHE_KEY);
@@ -45,18 +57,19 @@ export async function fetchQuestionsByChapter(chapter = 1) {
     cache = decodeCache(cachedEncoded);
   }
 
-  // Check if the cache for this chapter exists and is still fresh
-  if (cache[chapter] && (Date.now() - cache[chapter].timestamp < STALE_TIME)) {
-    return cache[chapter].questions;
+  // Check if the cache for this chapter and source exists and is still fresh
+  const cacheKey = questionsCacheKey(contentSource, chapter);
+  if (cache[cacheKey] && (Date.now() - cache[cacheKey].timestamp < STALE_TIME)) {
+    return cache[cacheKey].questions;
   }
 
   // Otherwise, fetch from the function
   const functions = getFunctions(firebaseApp, "us-west1");
   const getQuestionsByChapterCallable = httpsCallable(functions, "getQuestionsByChapter");
   try {
-    const result = await getQuestionsByChapterCallable({ chapter });
+    const result = await getQuestionsByChapterCallable({ chapter, contentSource });
     // Update the cache object with the new data
-    cache[chapter] = {
+    cache[cacheKey] = {
       timestamp: Date.now(),
       questions: result.data.questions,
     };

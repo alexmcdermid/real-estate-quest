@@ -10,4 +10,6 @@
  * @property {UUID} sharedQuestionText - (Optional) UUID reference to a shared question text document.
  * @property {boolean} premium - is the question a premium only question.
  * @property {string} explanation - The question explanation text.
+ * @property {boolean} [aiGenerated] - true for AI-generated questions (questionsAi); absent on human questions.
+ * @property {string} [aiQuestionId] - AI questions only: stable id from review through the AI questions repo.
  */

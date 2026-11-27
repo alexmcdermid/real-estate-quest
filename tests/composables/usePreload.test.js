@@ -43,7 +43,7 @@ describe("usePreload", () => {
 
   it("preloads and stores questions/flashcards when cache is stale", async () => {
     const staleCache = encodeCache({
-      1: { timestamp: Date.now() - STALE_TIME - 1000, questions: [{ id: "old" }] },
+      questions_mixed_1: { timestamp: Date.now() - STALE_TIME - 1000, questions: [{ id: "old" }] },
     });
     localStorage.setItem(CACHE_KEY, staleCache);
 
@@ -51,14 +51,41 @@ describe("usePreload", () => {
       data: {
         questions: { 1: [{ id: "q1" }] },
         flashcards: { 2: [{ id: "f1" }] },
+        contentSource: "mixed",
       },
     });
 
     await preloadContent();
 
     expect(httpsCallable).toHaveBeenCalledTimes(1);
+    // No saved choice yet: the default is sent
+    expect(mockCallable).toHaveBeenCalledWith({ contentSource: "mixed" });
     const stored = decodeCache(localStorage.getItem(CACHE_KEY));
-    expect(stored[1].questions).toEqual([{ id: "q1" }]);
-    expect(stored["flashcards_2"].flashcards).toEqual([{ id: "f1" }]);
+    expect(stored.questions_mixed_1.questions).toEqual([{ id: "q1" }]);
+    expect(stored.flashcards_mixed_2.flashcards).toEqual([{ id: "f1" }]);
+  });
+
+  it("sends the saved content source and stores questions and flashcards under the source the server applied", async () => {
+    localStorage.setItem(CACHE_KEY, encodeCache({ options: { shuffled: false, contentSource: "ai" } }));
+
+    // e.g. AI serving is off, so the server applied "human"
+    mockCallable.mockResolvedValue({
+      data: {
+        questions: { 1: [{ id: "h1" }], 2: [{ id: "h2" }] },
+        flashcards: { 1: [{ id: "hf1" }] },
+        contentSource: "human",
+      },
+    });
+
+    await preloadContent();
+
+    expect(mockCallable).toHaveBeenCalledWith({ contentSource: "ai" });
+    const stored = decodeCache(localStorage.getItem(CACHE_KEY));
+    expect(stored.questions_human_1.questions).toEqual([{ id: "h1" }]);
+    expect(stored.questions_human_2.questions).toEqual([{ id: "h2" }]);
+    expect(stored.flashcards_human_1.flashcards).toEqual([{ id: "hf1" }]);
+    expect(stored.questions_ai_1).toBeUndefined();
+    expect(stored.flashcards_ai_1).toBeUndefined();
+    expect(stored.options.contentSource).toBe("ai");
   });
 });
