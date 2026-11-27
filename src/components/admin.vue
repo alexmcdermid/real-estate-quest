@@ -851,6 +851,16 @@ onMounted(async () => {
   gap: 0.5rem;
 }
 
+/* Wrap titles wider than the card (e.g. "Study Activity Logs (10000)" at 320px) instead of clipping them.
+   fit-content keeps a title on one line when it fits, so the search box drops below rather than squeezing it. */
+.v-card-title {
+  white-space: normal;
+}
+
+.v-card-title > div > div:first-child {
+  min-width: fit-content;
+}
+
 .v-card {
   border-radius: 12px;
 }

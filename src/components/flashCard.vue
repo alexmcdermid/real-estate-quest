@@ -163,6 +163,13 @@ function markDifficulty(level) {
   }
 }
 
+/* The card has a fixed height and clips overflow, so phones need the smaller size to fit long answers */
+@media (max-width: 600px) {
+  .flashcard-text {
+    font-size: 0.8125rem;
+  }
+}
+
 .preformatted {
   white-space: pre-wrap;
   word-break: break-word;
