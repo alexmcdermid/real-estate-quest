@@ -1,5 +1,5 @@
 <template>
-  <v-dialog v-model="dialog" max-width="500">
+  <v-dialog v-model="dialog" max-width="31.25rem">
     <v-card>
       <v-card-title class="headline">Quiz Options</v-card-title>
       <v-card-text>

@@ -100,7 +100,7 @@ function markDifficulty(level) {
 }
 
 .flashcard {
-  min-height: 220px;
+  min-height: 13.75rem;
   cursor: pointer;
 }
 
@@ -143,7 +143,7 @@ function markDifficulty(level) {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  min-height: 210px;
+  min-height: 13.125rem;
   max-height: 100%;
   overflow-y: auto;
   box-sizing: border-box;
@@ -151,7 +151,7 @@ function markDifficulty(level) {
 }
 
 .flashcard-text {
-  font-size: 17px;
+  font-size: 1.0625rem;
   width: 100%;
   word-break: break-word;
   text-align: center;
@@ -159,13 +159,7 @@ function markDifficulty(level) {
 
 @media (max-width: 960px) {
   .flashcard-text {
-    font-size: 15px;
-  }
-}
-
-@media (max-width: 600px) {
-  .flashcard-text {
-    font-size: 13px;
+    font-size: 0.9375rem;
   }
 }
 

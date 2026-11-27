@@ -150,7 +150,7 @@ watch(() => submitted.value, (newVal) => {
 
 <style scoped>
 .questionText {
-  font-size: 16px;
+  font-size: 1rem;
 }
 .preformatted {
   white-space: pre-wrap;

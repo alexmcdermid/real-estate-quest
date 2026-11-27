@@ -46,7 +46,7 @@ const props = defineProps({
 
 .pro-card {
   border-color: #1976D2;
-  min-height: 210px;
+  min-height: 13.125rem;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -59,7 +59,7 @@ const props = defineProps({
 }
 
 .questionText {
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 .preformatted {

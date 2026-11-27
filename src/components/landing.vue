@@ -16,21 +16,21 @@
     <!-- Features Section -->
     <v-row class="features-section mt-12" align="center" justify="space-around">
       <v-col cols="12" md="4" class="text-center">
-        <v-icon color="primary" size="48">mdi-school</v-icon>
+        <v-icon color="primary" size="3rem">mdi-school</v-icon>
         <h3>Practice That Matters</h3>
         <p>
           Sharpen your knowledge with 900+ BC real estate exam practice questions that mirror the structure and topics of the real licensing exam.
         </p>
       </v-col>
       <v-col cols="12" md="4" class="text-center">
-        <v-icon color="primary" size="48">mdi-lightbulb-on-outline</v-icon>
+        <v-icon color="primary" size="3rem">mdi-lightbulb-on-outline</v-icon>
         <h3>Focused Learning</h3>
         <p>
           Each question includes helpful explanations that serve as a complete BC real estate exam study guide to reinforce what you've learned.
         </p>
       </v-col>
       <v-col cols="12" md="4" class="text-center">
-        <v-icon color="primary" size="48">mdi-trophy-outline</v-icon>
+        <v-icon color="primary" size="3rem">mdi-trophy-outline</v-icon>
         <h3>Confident Exam Prep</h3>
         <p>
           Our BC real estate licensing resources help you prepare with confidence. Whether you're just starting or reviewing, we've got your back.
@@ -108,50 +108,50 @@ function navigateToPro() {
 
 <style scoped>
 .landing-page {
-  padding: 32px;
+  padding: 2rem;
 }
 
 .hero-section {
   background: linear-gradient(135deg, #1976D2, #0D47A1);
   color: white;
-  padding: 64px 16px;
+  padding: 4rem 1rem;
   border-radius: 8px;
 }
 
 .hero-title {
   font-size: 2.5rem;
   font-weight: bold;
-  margin-bottom: 16px;
+  margin-bottom: 1rem;
 }
 
 .hero-subtitle {
   font-size: 1.25rem;
-  margin-bottom: 32px;
+  margin-bottom: 2rem;
 }
 
 .cta-btn {
-  margin: 8px;
+  margin: 0.5rem;
 }
 
 .features-section h3 {
-  margin-top: 16px;
+  margin-top: 1rem;
   font-size: 1.5rem;
   font-weight: bold;
 }
 
 .features-section p {
   font-size: 1rem;
-  margin-top: 8px;
+  margin-top: 0.5rem;
 }
 
 .why-choose-us-section h2 {
   font-size: 2rem;
   font-weight: bold;
-  margin-bottom: 16px;
+  margin-bottom: 1rem;
 }
 
 .why-card {
-  padding: 16px;
+  padding: 1rem;
   transition: box-shadow 0.3s ease, transform 0.3s ease;
 }
 
@@ -170,11 +170,31 @@ function navigateToPro() {
 .cta-section h2 {
   font-size: 2rem;
   font-weight: bold;
-  margin-bottom: 16px;
+  margin-bottom: 1rem;
 }
 
 .cta-section p {
   font-size: 1.25rem;
-  margin-bottom: 32px;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 600px) {
+  .hero-section {
+    padding: 2.5rem 0.5rem;
+  }
+
+  .hero-title {
+    font-size: 1.75rem;
+  }
+
+  .hero-subtitle,
+  .cta-section p {
+    font-size: 1.0625rem;
+  }
+
+  .why-choose-us-section h2,
+  .cta-section h2 {
+    font-size: 1.5rem;
+  }
 }
 </style>
