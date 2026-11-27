@@ -95,9 +95,9 @@ const blurStyle = computed(() => {
 <style scoped>
 .blurred-cta-card {
   position: relative;
-  min-height: 210px;
+  min-height: 13.125rem;
   width: 100%;
-  height: 210px;
+  height: 13.125rem;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
@@ -110,7 +110,6 @@ const blurStyle = computed(() => {
   min-height: unset;
   height: unset;
   padding-bottom: 0;
-  max-width: 600px;
 }
 .flashcard-content {
   flex: 1;
@@ -118,12 +117,12 @@ const blurStyle = computed(() => {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  min-height: 180px;
+  min-height: 11.25rem;
   max-height: 100%;
   overflow-y: auto;
   box-sizing: border-box;
   width: 100%;
-  padding: 24px 20px 24px 20px;
+  padding: 1.5rem 1.25rem;
 }
 .blur-overlay {
   position: absolute;
@@ -134,7 +133,7 @@ const blurStyle = computed(() => {
   z-index: 2;
   background: rgba(var(--v-theme-surface), 0.7);
   pointer-events: none;
-  padding: 24px 20px 24px 20px;
+  padding: 1.5rem 1.25rem;
 }
 .blurred-cta-text {
   font-size: 1.1rem;
@@ -150,28 +149,28 @@ const blurStyle = computed(() => {
   min-height: 0;
 }
 .blurred-main-text, .flashcard-text {
-  font-size: 18px;
+  font-size: 1.125rem;
   text-align: center;
   width: 100%;
   word-break: break-word;
 }
 .questionText {
-  font-size: 16px;
+  font-size: 1rem;
 }
 @media (max-width: 960px) {
   .blurred-main-text, .flashcard-text {
-    font-size: 16px;
+    font-size: 1rem;
   }
   .questionText {
-    font-size: 15px;
+    font-size: 0.9375rem;
   }
 }
 @media (max-width: 600px) {
   .blurred-main-text, .flashcard-text {
-    font-size: 14px;
+    font-size: 0.875rem;
   }
   .questionText {
-    font-size: 14px;
+    font-size: 0.875rem;
   }
 }
 </style>

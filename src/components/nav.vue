@@ -1,8 +1,8 @@
 <template>
-  <v-app-bar app flat color="#0D3B66" :dark="isDark" :light="!isDark">
+  <v-app-bar app flat color="#0D3B66" :height="appBarHeight" :dark="isDark" :light="!isDark">
     <!-- Left-aligned navigation -->
     <v-btn icon class="nav-text" @click="navigateTo('/')">
-      <img src="/favicon.ico" alt="Home" style="width: 24px; height: 24px;" />
+      <img src="/favicon.ico" alt="Home" style="width: 1.5rem; height: 1.5rem;" />
     </v-btn>
 
     <!-- Centered Questions Button -->
@@ -73,6 +73,7 @@ import { useRouter } from "vue-router";
 import { ref, computed } from "vue";
 import { useAuthStore } from "@/composables/useAuth";
 import { storeToRefs } from "pinia";
+import { useDisplay } from "vuetify";
 import useDark from "../composables/useDark";
 
 import LoginModal from "./loginModal.vue";
@@ -83,6 +84,14 @@ const authStore = useAuthStore();
 const { isAuthenticated, user, isAdmin } = storeToRefs(authStore);
 
 const { isDark, darkModeIcon, toggleDarkMode } = useDark();
+
+// Follows the root font-size scaling in App.vue: 64px up to 1920px wide, growing to 96px at 3840px.
+// Vuetify needs the app bar height as a number to lay out v-main, so it can't be a rem value.
+const { width: viewportWidth } = useDisplay();
+const appBarHeight = computed(() => {
+  const largeScreenScale = Math.min(Math.max(0.5 + viewportWidth.value / 3840, 1), 1.5);
+  return Math.round(64 * largeScreenScale);
+});
 const userPhotoURL = computed(() => user.value?.photoURL || defaultAvatar);
 const loginModal = ref(null);
 const optionModal = ref(null);
@@ -138,13 +147,13 @@ function navigateTo(path) {
 
 .v-avatar img {
   border-radius: 50%;
-  width: 32px;
-  height: 32px;
+  width: 2rem;
+  height: 2rem;
   object-fit: cover;
 }
 
 .v-avatar {
-  width: 36px;
-  height: 36px;
+  width: 2.25rem;
+  height: 2.25rem;
 }
 </style>

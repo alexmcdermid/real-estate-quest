@@ -1,5 +1,5 @@
 <template>
-  <v-dialog v-model="dialog" max-width="500">
+  <v-dialog v-model="dialog" max-width="31.25rem">
     <v-card>
       <v-card-title class="headline">Login</v-card-title>
       <v-card-text>
@@ -130,7 +130,7 @@ onMounted(() => {
   border: 1px solid #ddd;
   border-radius: 4px;
   padding: 10px 20px;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: bold;
   color: #555;
   cursor: pointer;
@@ -153,8 +153,8 @@ onMounted(() => {
 }
 
 .google-icon {
-  width: 24px;
-  height: 24px;
+  width: 1.5rem;
+  height: 1.5rem;
   margin-right: 10px;
 }
 
@@ -164,7 +164,7 @@ onMounted(() => {
   border: none;
   padding: 10px 20px;
   border-radius: 4px;
-  font-size: 16px;
+  font-size: 1rem;
   cursor: pointer;
   transition: background 0.3s ease;
   width: 100%;
@@ -180,7 +180,7 @@ onMounted(() => {
   border: none;
   padding: 10px 20px;
   border-radius: 4px;
-  font-size: 16px;
+  font-size: 1rem;
   cursor: pointer;
   transition: background 0.3s ease;
   width: 100%;
@@ -196,7 +196,7 @@ onMounted(() => {
 }
 
 .login-blurb {
-  font-size: 13px !important;
+  font-size: 0.8125rem !important;
   color: #666;
   text-align: center;
 }
