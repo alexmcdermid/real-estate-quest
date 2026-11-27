@@ -1,0 +1,27 @@
+name: AI PR Review
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  review:
+    if: >-
+      github.event.issue.pull_request
+      && startsWith(github.event.comment.body, '/ai-review')
+      && github.event.comment.author_association == 'OWNER'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      pull-requests: write
+    concurrency:
+      group: ai-review-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    steps:
+      - uses: alexmcdermid/ai-review@main
+        with:
+          anthropic-api-key: ${{ secrets.ANTHROPIC_REVIEWER_API_KEY }}
+          openai-api-key: ${{ secrets.OPENAI_API_REVIEWER_KEY }}
